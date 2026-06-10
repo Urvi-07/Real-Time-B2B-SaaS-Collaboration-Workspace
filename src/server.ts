@@ -21,8 +21,8 @@ process.on('uncaughtException', (err: Error) => {
 });
 
 // Handle Unhandled Promise Rejections
-process.on('unhandledRejection', (reason: any) => {
-  logger.error('💥 Unhandled Promise Rejection! Shutting down...', reason);
+process.on('unhandledRejection', (reason: unknown) => {
+  logger.error('💥 Unhandled Promise Rejection! Shutting down...', reason as Error);
   server.close(() => {
     process.exit(1);
   });
@@ -35,7 +35,7 @@ const shutdownGracefully = (signal: string) => {
     logger.info('💤 HTTP server closed.');
     process.exit(0);
   });
-  
+
   // Force shutdown if taking too long
   setTimeout(() => {
     logger.error('⚠️ Forcefully shutting down because connections took too long to close');

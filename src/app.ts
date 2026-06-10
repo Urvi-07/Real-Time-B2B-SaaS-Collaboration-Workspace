@@ -24,14 +24,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // 3. HTTP Request Logging (Morgan streaming to Winston)
-const morganMiddleware = morgan(
-  ':method :url :status :res[content-length] - :response-time ms',
-  {
-    stream: {
-      write: (message) => logger.http(message.trim()),
-    },
-  }
-);
+const morganMiddleware = morgan(':method :url :status :res[content-length] - :response-time ms', {
+  stream: {
+    write: (message) => logger.http(message.trim()),
+  },
+});
 app.use(morganMiddleware);
 
 // 4. Global Rate Limiter

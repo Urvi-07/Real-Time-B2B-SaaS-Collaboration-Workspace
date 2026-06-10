@@ -15,17 +15,14 @@ const consoleFormat = printf(({ level, message, timestamp, stack, ...metadata })
 });
 
 const getFormats = () => {
-  const formats = [
-    errors({ stack: true }),
-    timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  ];
-  
+  const formats = [errors({ stack: true }), timestamp({ format: 'YYYY-MM-DD HH:mm:ss' })];
+
   if (config.NODE_ENV === 'development') {
     formats.push(colorize(), consoleFormat);
   } else {
     formats.push(json());
   }
-  
+
   return combine(...formats);
 };
 

@@ -8,16 +8,16 @@ export const errorHandler: ErrorRequestHandler = (
   err: Error,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void => {
   let statusCode = 500;
   let message = 'Internal Server Error';
-  let details: any = null;
+  let details: unknown = null;
 
   if (err instanceof AppError) {
     statusCode = err.statusCode;
     message = err.message;
-    
+
     if (!err.isOperational) {
       logger.error(`[AppError] System Error: ${err.message}`, { stack: err.stack });
     } else {
@@ -34,16 +34,21 @@ export const errorHandler: ErrorRequestHandler = (
   } else {
     // Unhandled / system errors
     logger.error(`[UnhandledError] ${err.name}: ${err.message}`, { stack: err.stack });
-    
+
     if (config.NODE_ENV === 'development') {
       message = err.message;
       details = err.stack;
     }
   }
 
-  res.status(statusCode).json({
+  const responseBody: Record<string, unknown> = {
     status: 'error',
     message,
-    ...(details && { details }),
-  });
+  };
+
+  if (details !== null && details !== undefined) {
+    responseBody.details = details;
+  }
+
+  res.status(statusCode).json(responseBody);
 };
