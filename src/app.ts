@@ -7,7 +7,7 @@ import { config } from './infrastructure/config/config';
 import { logger } from './infrastructure/logging/logger';
 import { errorHandler } from './presentation/http/middleware/errorHandler';
 import { NotFoundError } from './infrastructure/errors/AppError';
-
+import authRoutes from './presentation/http/routes/authRoutes';
 const app: Application = express();
 
 // 1. Security Middlewares
@@ -53,7 +53,8 @@ app.get('/health', (req: Request, res: Response) => {
     env: config.NODE_ENV,
   });
 });
-
+// Authentication Routes
+app.use('/api/auth', authRoutes);
 // 6. Catch-all route for unregistered endpoints (404)
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(new NotFoundError(`Route ${req.originalUrl} not found`));
