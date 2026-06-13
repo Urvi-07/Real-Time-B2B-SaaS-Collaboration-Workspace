@@ -12,6 +12,8 @@ const configSchema = z.object({
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'http', 'debug']).default('info'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000), // 15 minutes in ms
   RATE_LIMIT_MAX: z.coerce.number().default(100), // max requests per window
+  JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 });
 
 const parseConfig = () => {

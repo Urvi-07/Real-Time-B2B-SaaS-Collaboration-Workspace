@@ -8,6 +8,7 @@ import { logger } from './infrastructure/logging/logger';
 import { errorHandler } from './presentation/http/middleware/errorHandler';
 import { NotFoundError } from './infrastructure/errors/AppError';
 import authRoutes from './presentation/http/routes/authRoutes';
+import { sendSuccess } from './presentation/http/utils/apiResponse';
 const app: Application = express();
 
 // 1. Security Middlewares
@@ -45,9 +46,8 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // 5. Health Check Router
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'success',
+app.get('/health', (_req: Request, res: Response) => {
+  sendSuccess(res, 'System health statistics retrieved successfully', {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     env: config.NODE_ENV,
