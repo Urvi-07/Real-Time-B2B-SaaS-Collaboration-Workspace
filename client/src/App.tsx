@@ -4,13 +4,13 @@ import Dashboard from "./pages/Dashboard";
 
 function App() {
   return (
-    <>
+    <div className="p-8 space-y-8">
       <Login />
       <hr />
       <Register />
       <hr />
       <Dashboard />
-    </>
+    </div>
   );
 }
 
