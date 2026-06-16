@@ -1,7 +1,34 @@
+import { useEffect, useState } from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
+  const [user, setUser] = useState<any>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const token = localStorage.getItem("token");
+
+        const res = await axios.get(
+          "http://localhost:5000/api/auth/profile",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        setUser(res.data);
+      } catch (err) {
+        localStorage.removeItem("token");
+        navigate("/login");
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -9,49 +36,19 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b1220] text-white flex">
+    <div>
+      <h1>Dashboard</h1>
 
-      {/* Sidebar */}
-      <div className="w-64 bg-white/5 border-r border-white/10 p-6">
-        <h1 className="text-xl font-bold mb-8">Workspace</h1>
-
-        <ul className="space-y-4 text-gray-300">
-          <li className="hover:text-white cursor-pointer">🏠 Dashboard</li>
-          <li className="hover:text-white cursor-pointer">📁 Projects</li>
-          <li className="hover:text-white cursor-pointer">💬 Chat</li>
-          <li className="hover:text-white cursor-pointer">⚙️ Settings</li>
-        </ul>
-
-        <button
-          onClick={logout}
-          className="mt-10 w-full py-2 rounded-lg bg-red-500/20 hover:bg-red-500/40"
-        >
-          Logout
-        </button>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 p-8">
-
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-
-        <div className="grid grid-cols-3 gap-6">
-
-          <div className="p-5 rounded-xl bg-white/5 border border-white/10">
-            📁 Projects
-          </div>
-
-          <div className="p-5 rounded-xl bg-white/5 border border-white/10">
-            💬 Messages
-          </div>
-
-          <div className="p-5 rounded-xl bg-white/5 border border-white/10">
-            ⚡ Activity
-          </div>
-
+      {user ? (
+        <div>
+          <p>Welcome, {user.name}</p>
+          <p>{user.email}</p>
         </div>
+      ) : (
+        <p>Loading...</p>
+      )}
 
-      </div>
+      <button onClick={logout}>Logout</button>
     </div>
   );
 }
