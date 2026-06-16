@@ -72,3 +72,11 @@ export const login = async (req: Request, res: Response) => {
     token,
   });
 };
+
+export const profile = (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Protected profile accessed successfully',
+    user: (req as any).user,
+  });
+};
