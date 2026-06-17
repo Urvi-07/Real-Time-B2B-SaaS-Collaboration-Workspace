@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 
 interface AuthRequest extends Request {
-  user?: string | object;
+  user?: string | JwtPayload;
 }
 
 export const authMiddleware = (
@@ -12,14 +12,28 @@ export const authMiddleware = (
 ) => {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader) {
     return res.status(401).json({
       status: 'error',
-      message: 'Access denied. No token provided.',
+      message: 'Authorization header is required',
+    });
+  }
+
+  if (!authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Invalid authorization format. Use Bearer token',
     });
   }
 
   const token = authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Token is required',
+    });
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret');
@@ -28,7 +42,7 @@ export const authMiddleware = (
   } catch {
     return res.status(401).json({
       status: 'error',
-      message: 'Invalid token',
+      message: 'Invalid or expired token',
     });
   }
 };
