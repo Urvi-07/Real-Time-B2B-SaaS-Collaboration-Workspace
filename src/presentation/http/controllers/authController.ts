@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../../../domain/entities/User';
-
+import { AuthRequest } from '../middleware/authMiddleware';
+import { JwtPayload } from 'jsonwebtoken';
 const users: User[] = [];
 
 export const register = async (req: Request, res: Response) => {
@@ -73,10 +74,10 @@ export const login = async (req: Request, res: Response) => {
   });
 };
 
-export const profile = (req: Request, res: Response) => {
-  const { userId, email } = (req as any).user;
+export const profile = (req: AuthRequest, res: Response) => {
+  const { userId, email } = req.user as JwtPayload;
 
-  res.status(200).json({
+  return res.status(200).json({
     status: 'success',
     message: 'Protected profile accessed successfully',
     user: {
