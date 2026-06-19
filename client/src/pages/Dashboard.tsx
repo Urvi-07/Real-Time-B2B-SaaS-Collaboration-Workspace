@@ -2,12 +2,18 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+interface User {
+  name: string;
+  email: string;
+}
+
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchProfile = async () => {
       try {
         const token = localStorage.getItem("token");
 
@@ -21,14 +27,14 @@ export default function Dashboard() {
         );
 
         setUser(res.data);
-      } catch (err) {
+      } catch (error) {
         localStorage.removeItem("token");
         navigate("/login");
       }
     };
 
-    fetchUser();
-  }, []);
+    fetchProfile();
+  }, [navigate]);
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -36,19 +42,41 @@ export default function Dashboard() {
   };
 
   return (
-    <div>
-      <h1>Dashboard</h1>
+    <div className="min-h-screen bg-slate-950 text-white">
+      <nav className="bg-slate-900 border-b border-slate-800 px-8 py-4 flex justify-between">
+        <h1 className="text-xl font-bold">
+          Collaboration Workspace
+        </h1>
 
-      {user ? (
-        <div>
-          <p>Welcome, {user.name}</p>
-          <p>{user.email}</p>
+        <button
+          onClick={logout}
+          className="bg-red-600 px-4 py-2 rounded-lg"
+        >
+          Logout
+        </button>
+      </nav>
+
+      <div className="p-8">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <h2 className="text-2xl font-bold mb-4">
+            Dashboard
+          </h2>
+
+          {user ? (
+            <>
+              <p className="text-slate-300">
+                Name: {user.name}
+              </p>
+
+              <p className="text-slate-300">
+                Email: {user.email}
+              </p>
+            </>
+          ) : (
+            <p>Loading profile...</p>
+          )}
         </div>
-      ) : (
-        <p>Loading...</p>
-      )}
-
-      <button onClick={logout}>Logout</button>
+      </div>
     </div>
   );
 }
