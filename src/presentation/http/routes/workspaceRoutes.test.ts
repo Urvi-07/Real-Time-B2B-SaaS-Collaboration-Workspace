@@ -3,12 +3,14 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import workspaceRoutes from './workspaceRoutes';
 import { WorkspaceModel } from '../../../infrastructure/database/models/Workspace';
+import { errorHandler } from '../middleware/errorHandler';
 
 jest.mock('../../../infrastructure/database/models/Workspace');
 
 const app = express();
 app.use(express.json());
 app.use('/api/workspaces', workspaceRoutes);
+app.use(errorHandler);
 
 describe('Workspace Routes Integration', () => {
   const secret = 'default_secret';
@@ -66,5 +68,56 @@ describe('Workspace Routes Integration', () => {
         ownerId: 'owner123',
       })
     );
+  });
+
+  describe('POST /api/workspaces - Validation', () => {
+    it('should reject creation if name is missing', async () => {
+      const res = await request(app)
+        .post('/api/workspaces')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ description: 'No name' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toBe('Validation Failed');
+      expect(res.body.errors[0].field).toBe('body.name');
+      expect(res.body.errors[0].message).toBe('Workspace name is required');
+    });
+
+    it('should reject creation if name is shorter than 3 characters', async () => {
+      const res = await request(app)
+        .post('/api/workspaces')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'ab' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.errors[0].message).toBe('Workspace name must be at least 3 characters');
+    });
+
+    it('should reject creation if description is longer than 500 characters', async () => {
+      const longDescription = 'a'.repeat(501);
+      const res = await request(app)
+        .post('/api/workspaces')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Valid Name', description: longDescription });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.errors[0].message).toBe('Workspace description cannot exceed 500 characters');
+    });
+  });
+
+  describe('PUT /api/workspaces/:id - Validation', () => {
+    it('should reject updates if name is shorter than 3 characters', async () => {
+      const res = await request(app)
+        .put('/api/workspaces/ws1')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'xy' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.errors[0].message).toBe('Workspace name must be at least 3 characters');
+    });
   });
 });
