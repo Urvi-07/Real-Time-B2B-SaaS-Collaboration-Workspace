@@ -16,11 +16,25 @@ export const validateRequest = (schema: ZodObject<ZodRawShape>) => {
         params: req.params,
       });
 
-      req.body = parsed.body ?? req.body;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      req.query = (parsed.query ?? req.query) as any;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      req.params = (parsed.params ?? req.params) as any;
+      if (parsed.body !== undefined) {
+        req.body = parsed.body;
+      }
+      if (parsed.query !== undefined) {
+        Object.defineProperty(req, 'query', {
+          value: parsed.query,
+          writable: true,
+          configurable: true,
+          enumerable: true,
+        });
+      }
+      if (parsed.params !== undefined) {
+        Object.defineProperty(req, 'params', {
+          value: parsed.params,
+          writable: true,
+          configurable: true,
+          enumerable: true,
+        });
+      }
 
       next();
     } catch (error) {

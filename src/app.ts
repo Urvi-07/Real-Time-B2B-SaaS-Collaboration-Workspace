@@ -8,6 +8,7 @@ import { logger } from './infrastructure/logging/logger';
 import { errorHandler } from './presentation/http/middleware/errorHandler';
 import { NotFoundError } from './infrastructure/errors/AppError';
 import authRoutes from './presentation/http/routes/authRoutes';
+import workspaceRoutes from './presentation/http/routes/workspaceRoutes';
 import { sendSuccess } from './presentation/http/utils/apiResponse';
 const app: Application = express();
 
@@ -55,6 +56,8 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 // Authentication Routes
 app.use('/api/auth', authRoutes);
+// Workspace Routes
+app.use('/api/workspaces', workspaceRoutes);
 // 6. Catch-all route for unregistered endpoints (404)
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(new NotFoundError(`Route ${req.originalUrl} not found`));
