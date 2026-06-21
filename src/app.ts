@@ -54,6 +54,14 @@ app.get('/health', (_req: Request, res: Response) => {
     env: config.NODE_ENV,
   });
 });
+app.get('/', (_req: Request, res: Response) => {
+  sendSuccess(res, 'Backend is running successfully', {
+    service: 'Real-Time B2B SaaS Collaboration Workspace',
+    status: 'healthy',
+    env: config.NODE_ENV,
+    timestamp: new Date().toISOString(),
+  });
+});
 // Authentication Routes
 app.use('/api/auth', authRoutes);
 // Workspace Routes
