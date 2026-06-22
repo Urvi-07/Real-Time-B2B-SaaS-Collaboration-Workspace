@@ -1,82 +1,84 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import api from "../api/axios";
 
-interface User {
+interface Workspace {
+  id: string;
   name: string;
-  email: string;
+  description?: string;
 }
 
 export default function Dashboard() {
-  const [user, setUser] = useState<User | null>(null);
-
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = localStorage.getItem("token");
-
-        const res = await axios.get(
-          "http://localhost:5000/api/auth/profile",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        setUser(res.data);
-      } catch (error) {
-        localStorage.removeItem("token");
-        navigate("/login");
-      }
-    };
-
-    fetchProfile();
-  }, [navigate]);
-
-  const logout = () => {
-    localStorage.removeItem("token");
-    navigate("/login");
+  const fetchWorkspaces = async () => {
+    try {
+      const res = await api.get("/workspaces");
+      setWorkspaces(res.data?.data || []);
+    } catch (err) {
+      console.log(err);
+      setWorkspaces([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  useEffect(() => {
+    fetchWorkspaces();
+  }, []);
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <nav className="bg-slate-900 border-b border-slate-800 px-8 py-4 flex justify-between">
-        <h1 className="text-xl font-bold">
-          Collaboration Workspace
-        </h1>
+    <div className="min-h-screen bg-slate-950 text-white p-6">
 
-        <button
-          onClick={logout}
-          className="bg-red-600 px-4 py-2 rounded-lg"
-        >
-          Logout
-        </button>
-      </nav>
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-slate-400 text-sm">
+            Manage your workspaces
+          </p>
+        </div>
 
-      <div className="p-8">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-          <h2 className="text-2xl font-bold mb-4">
-            Dashboard
-          </h2>
+        <div className="flex gap-3">
+          <button
+            onClick={() => navigate("/workspaces")}
+            className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg"
+          >
+            View
+          </button>
 
-          {user ? (
-            <>
-              <p className="text-slate-300">
-                Name: {user.name}
-              </p>
-
-              <p className="text-slate-300">
-                Email: {user.email}
-              </p>
-            </>
-          ) : (
-            <p>Loading profile...</p>
-          )}
+          <button
+            onClick={() => navigate("/workspaces/create")}
+            className="bg-blue-600 px-4 py-2 rounded-lg"
+          >
+            + Create
+          </button>
         </div>
       </div>
+
+      {/* CONTENT */}
+      {loading ? (
+        <p className="text-slate-400">Loading...</p>
+      ) : workspaces.length === 0 ? (
+        <p className="text-slate-500">No workspaces found</p>
+      ) : (
+        <div className="grid md:grid-cols-3 gap-4">
+          {workspaces.map((w) => (
+            <div
+              key={w.id}
+              onClick={() => navigate(`/workspaces/${w.id}`)}
+              className="bg-slate-900 border border-slate-800 p-5 rounded-xl cursor-pointer hover:bg-slate-800"
+            >
+              <h2 className="font-semibold">{w.name}</h2>
+              <p className="text-slate-400 text-sm">
+                {w.description || "No description"}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

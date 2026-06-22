@@ -1,6 +1,6 @@
 import { useState } from "react";
-import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
+import api from "../api/axios";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -15,18 +15,35 @@ export default function Login() {
 
     try {
       setLoading(true);
+      setError("");
 
-      const res = await axios.post(
-        "http://localhost:5000/api/auth/login",
-        {
-          email,
-          password,
-        }
-      );
+      const res = await api.post("/auth/login", {
+        email,
+        password,
+      });
 
-      localStorage.setItem("token", res.data.token);
+      console.log("LOGIN RESPONSE:", res.data); // DEBUG
 
-      navigate("/dashboard");
+      // ✅ SAFE TOKEN HANDLING (FIXES ALL BACKEND SHAPES)
+      const token =
+        res.data?.token ||
+        res.data?.data?.token ||
+        res.data?.accessToken;
+
+      if (!token) {
+        setError("Login failed: Token not received from backend");
+        return;
+      }
+
+      localStorage.setItem("token", token);
+
+      console.log("TOKEN SAVED:", token);
+
+      // small delay ensures state update + route sync
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 100);
+
     } catch (err: any) {
       setError(err.response?.data?.message || "Login failed");
     } finally {
@@ -37,6 +54,7 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+
         <h1 className="text-3xl font-bold text-white text-center mb-2">
           Welcome Back
         </h1>
