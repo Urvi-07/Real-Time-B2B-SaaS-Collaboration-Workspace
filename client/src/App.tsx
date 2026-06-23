@@ -1,49 +1,72 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 
-/* 🔐 Auth Guard */
-function ProtectedRoute({ children }: { children: JSX.Element }) {
-  const isAuth = Boolean(localStorage.getItem("token"));
+import WorkspacePage from "./pages/workspaces/WorkspacePage";
+import CreateWorkspace from "./pages/workspaces/CreateWorkspacePage";
+import WorkspaceDetail from "./pages/workspaces/WorkspaceDetailsPage";
 
-  return isAuth ? children : <Navigate to="/login" replace />;
+import { ReactNode } from "react";
+
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const token = localStorage.getItem("token");
+
+  return token ? children : <Navigate to="/login" replace />;
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <Routes>
 
-        {/* 🔓 Default route */}
-        <Route
-          path="/"
-          element={
-            localStorage.getItem("token")
-              ? <Navigate to="/dashboard" replace />
-              : <Navigate to="/login" replace />
-          }
-        />
+      {/* Public */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
-        {/* 🔓 Public routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+      {/* Protected */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
 
-        {/* 🔐 Protected route */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+      <Route
+        path="/workspaces"
+        element={
+          <ProtectedRoute>
+            <WorkspacePage />
+          </ProtectedRoute>
+        }
+      />
 
-        {/* ❌ Catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+      <Route
+        path="/workspaces/create"
+        element={
+          <ProtectedRoute>
+            <CreateWorkspace />
+          </ProtectedRoute>
+        }
+      />
 
-      </Routes>
-    </BrowserRouter>
+      <Route
+        path="/workspaces/:id"
+        element={
+          <ProtectedRoute>
+            <WorkspaceDetail />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Default */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+
+      {/* Catch all */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
+
+    </Routes>
   );
 }
