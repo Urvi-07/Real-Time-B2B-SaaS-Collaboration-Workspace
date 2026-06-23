@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketServer, Socket } from 'socket.io';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 import { logger } from '../logging/logger';
 import { config } from '../config/config';
 
@@ -21,19 +22,51 @@ export class SocketService {
       pingInterval: 25000,
     });
 
+    this.io.use((socket: Socket, next) => {
+      const token = socket.handshake.auth?.token;
+
+      if (!token) {
+        return next(new Error('Authentication token is required'));
+      }
+
+      try {
+        const decoded = jwt.verify(
+          token,
+          process.env.JWT_SECRET || 'default_secret'
+        ) as JwtPayload;
+
+        socket.data.user = {
+          id: decoded.userId,
+          email: decoded.email,
+        };
+
+        next();
+      } catch {
+        return next(new Error('Invalid or expired authentication token'));
+      }
+    });
+
     logger.info('🚀 Socket.io Server initialized');
 
     this.io.on('connection', (socket: Socket) => {
-      logger.info(`🔌 Socket connected: ${socket.id}`);
+      logger.info(
+        `🔌 Socket connected: ${socket.id} as user ${socket.data.user?.email}`
+      );
 
       socket.on('disconnect', (reason) => {
         logger.info(`🔌 Socket disconnected: ${socket.id} (Reason: ${reason})`);
       });
 
-      // Basic diagnosis route to verify real-time connection
       socket.on('ping-server', (data) => {
-        logger.debug(`📩 Received ping-server from ${socket.id}: ${JSON.stringify(data)}`);
-        socket.emit('pong-client', { message: 'hello from server', timestamp: Date.now() });
+        logger.debug(
+          `📩 Received ping-server from ${socket.id}: ${JSON.stringify(data)}`
+        );
+
+        socket.emit('pong-client', {
+          message: 'hello from server',
+          user: socket.data.user,
+          timestamp: Date.now(),
+        });
       });
     });
 
@@ -44,6 +77,7 @@ export class SocketService {
     if (!this.io) {
       throw new Error('Socket.io has not been initialized. Call init() first.');
     }
+
     return this.io;
   }
 }
