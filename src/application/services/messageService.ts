@@ -49,18 +49,33 @@ export const createMessage = async (
 };
 
 /**
- * Retrieves the full chat history of a workspace, sorted chronologically.
+ * Retrieves a paginated list of chat history for a workspace, sorted chronologically.
  * 
  * @param workspaceId The MongoDB identifier of the target workspace.
+ * @param page The requested page number (1-indexed).
+ * @param limit The maximum number of messages to return per page.
  */
-export const getWorkspaceMessages = async (workspaceId: string): Promise<IMessage[]> => {
+export const getWorkspaceMessages = async (
+  workspaceId: string,
+  page = 1,
+  limit = 20
+): Promise<{ messages: IMessage[]; total: number }> => {
   if (!workspaceId || !Types.ObjectId.isValid(workspaceId)) {
     throw new BadRequestError('Invalid workspace ID');
   }
 
-  const docs = await MessageModel.find({
-    workspaceId: new Types.ObjectId(workspaceId),
-  }).sort({ createdAt: 1 });
+  const query = { workspaceId: new Types.ObjectId(workspaceId) };
+  
+  const [total, docs] = await Promise.all([
+    MessageModel.countDocuments(query),
+    MessageModel.find(query)
+      .sort({ createdAt: 1 })
+      .skip((page - 1) * limit)
+      .limit(limit),
+  ]);
 
-  return docs.map(mapToDomain);
+  return {
+    messages: docs.map(mapToDomain),
+    total,
+  };
 };
