@@ -57,7 +57,7 @@ describe('Message Service', () => {
   });
 
   describe('getWorkspaceMessages', () => {
-    it('should fetch workspace messages in chronological order', async () => {
+    it('should fetch workspace messages in chronological order with pagination', async () => {
       const mockDocs = [
         {
           _id: new Types.ObjectId(),
@@ -78,20 +78,29 @@ describe('Message Service', () => {
       ];
 
       const mockQuery = {
-        sort: jest.fn().mockResolvedValue(mockDocs),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue(mockDocs),
       };
 
+      (MessageModel.countDocuments as jest.Mock).mockResolvedValue(2);
       (MessageModel.find as jest.Mock).mockReturnValue(mockQuery);
 
-      const result = await getWorkspaceMessages(validWorkspaceId);
+      const result = await getWorkspaceMessages(validWorkspaceId, 1, 2);
 
+      expect(MessageModel.countDocuments).toHaveBeenCalledWith({
+        workspaceId: new Types.ObjectId(validWorkspaceId),
+      });
       expect(MessageModel.find).toHaveBeenCalledWith({
         workspaceId: new Types.ObjectId(validWorkspaceId),
       });
       expect(mockQuery.sort).toHaveBeenCalledWith({ createdAt: 1 });
-      expect(result.length).toBe(2);
-      expect(result[0].content).toBe('First Msg');
-      expect(result[1].content).toBe('Second Msg');
+      expect(mockQuery.skip).toHaveBeenCalledWith(0);
+      expect(mockQuery.limit).toHaveBeenCalledWith(2);
+      expect(result.total).toBe(2);
+      expect(result.messages.length).toBe(2);
+      expect(result.messages[0].content).toBe('First Msg');
+      expect(result.messages[1].content).toBe('Second Msg');
     });
 
     it('should throw BadRequestError if workspaceId is invalid', async () => {
