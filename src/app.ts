@@ -9,6 +9,7 @@ import { errorHandler } from './presentation/http/middleware/errorHandler';
 import { NotFoundError } from './infrastructure/errors/AppError';
 import authRoutes from './presentation/http/routes/authRoutes';
 import workspaceRoutes from './presentation/http/routes/workspaceRoutes';
+import messageRoutes from './presentation/http/routes/messageRoutes';
 import { sendSuccess } from './presentation/http/utils/apiResponse';
 const app: Application = express();
 
@@ -66,6 +67,8 @@ app.get('/', (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 // Workspace Routes
 app.use('/api/workspaces', workspaceRoutes);
+// Message Routes
+app.use('/api/messages', messageRoutes);
 // 6. Catch-all route for unregistered endpoints (404)
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(new NotFoundError(`Route ${req.originalUrl} not found`));
