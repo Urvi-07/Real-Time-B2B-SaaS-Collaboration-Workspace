@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { ReactNode, useEffect } from "react";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -8,7 +9,7 @@ import WorkspacePage from "./pages/workspaces/WorkspacePage";
 import CreateWorkspace from "./pages/workspaces/CreateWorkspacePage";
 import WorkspaceDetail from "./pages/workspaces/WorkspaceDetailsPage";
 
-import { ReactNode } from "react";
+import { socket } from "./socket";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem("token");
@@ -17,9 +18,29 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      socket.connect();
+
+      socket.on("connect", () => {
+        console.log("✅ Socket Connected:", socket.id);
+      });
+
+      socket.on("disconnect", () => {
+        console.log("❌ Socket Disconnected");
+      });
+    }
+
+    return () => {
+      socket.off("connect");
+      socket.off("disconnect");
+    };
+  }, []);
+
   return (
     <Routes>
-
       {/* Public */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -66,7 +87,6 @@ export default function App() {
 
       {/* Catch all */}
       <Route path="*" element={<Navigate to="/login" replace />} />
-
     </Routes>
   );
 }
