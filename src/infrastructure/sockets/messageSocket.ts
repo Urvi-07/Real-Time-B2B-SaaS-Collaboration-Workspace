@@ -2,6 +2,7 @@ import { Server as SocketServer, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { createMessage } from '../../application/services/messageService';
 import { logger } from '../logging/logger';
+import { SOCKET_EVENTS } from './socketEvents';
 
 interface DecodedToken {
   userId: string;
@@ -44,57 +45,57 @@ export const registerMessageHandlers = (io: SocketServer) => {
     logger.info(`🔌 Chat Socket connected: ${socket.id} (User: ${userId})`);
 
     // Handle join-workspace room join request
-    socket.on('join-workspace', (workspaceId: string) => {
+    socket.on(SOCKET_EVENTS.JOIN_WORKSPACE, (workspaceId: string) => {
       if (!workspaceId) {
-        return socket.emit('error', { message: 'Workspace ID is required to join' });
+        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required to join' });
       }
       socket.join(workspaceId);
       logger.info(`🚪 User ${userId} joined room: ${workspaceId}`);
-      socket.to(workspaceId).emit('user-joined', { userId });
+      socket.to(workspaceId).emit(SOCKET_EVENTS.USER_JOINED, { userId });
     });
 
     // Handle leave-workspace room leave request
-    socket.on('leave-workspace', (workspaceId: string) => {
+    socket.on(SOCKET_EVENTS.LEAVE_WORKSPACE, (workspaceId: string) => {
       if (!workspaceId) {
-        return socket.emit('error', { message: 'Workspace ID is required to leave' });
+        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required to leave' });
       }
       socket.leave(workspaceId);
       logger.info(`🚪 User ${userId} left room: ${workspaceId}`);
-      socket.to(workspaceId).emit('user-left', { userId });
+      socket.to(workspaceId).emit(SOCKET_EVENTS.USER_LEFT, { userId });
     });
 
     // Handle send-message payload request from client
-    socket.on('send-message', async (data: { workspaceId: string; content: string }) => {
+    socket.on(SOCKET_EVENTS.SEND_MESSAGE, async (data: { workspaceId: string; content: string }) => {
       try {
         const { workspaceId, content } = data;
         const senderId = socket.data.user?.userId;
 
         if (!senderId) {
-          return socket.emit('error', { message: 'Authentication required' });
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
         }
 
         // Store message in MongoDB using the messageService
         const savedMessage = await createMessage(workspaceId, senderId, content);
 
         // Broadcast the saved message to all users in the same workspace room (including the sender)
-        io.to(workspaceId).emit('broadcast-message', savedMessage);
+        io.to(workspaceId).emit(SOCKET_EVENTS.BROADCAST_MESSAGE, savedMessage);
         logger.debug(`📤 Broadcasted message in workspace ${workspaceId} from user ${senderId}`);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to process message';
         logger.error(`❌ Socket send-message error: ${errorMessage}`);
-        socket.emit('error', { message: errorMessage });
+        socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
       }
     });
 
     // Handle custom broadcast-message triggers directly
-    socket.on('broadcast-message', (data: { workspaceId: string; message: unknown }) => {
+    socket.on(SOCKET_EVENTS.BROADCAST_MESSAGE, (data: { workspaceId: string; message: unknown }) => {
       const { workspaceId, message } = data;
       if (workspaceId && message) {
-        socket.to(workspaceId).emit('broadcast-message', message);
+        socket.to(workspaceId).emit(SOCKET_EVENTS.BROADCAST_MESSAGE, message);
       }
     });
 
-    socket.on('disconnect', (reason) => {
+    socket.on(SOCKET_EVENTS.DISCONNECT, (reason) => {
       logger.info(`🔌 Chat Socket disconnected: ${socket.id} (User: ${userId}). Reason: ${reason}`);
     });
   });
