@@ -2,6 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketServer, Socket } from 'socket.io';
 import { logger } from '../logging/logger';
 import { config } from '../config/config';
+import { registerMessageHandlers } from './messageSocket';
 
 export class SocketService {
   private static io: SocketServer | null = null;
@@ -22,6 +23,9 @@ export class SocketService {
     });
 
     logger.info('🚀 Socket.io Server initialized');
+
+    // Register real-time messaging event handlers and socket auth middleware
+    registerMessageHandlers(this.io);
 
     this.io.on('connection', (socket: Socket) => {
       logger.info(`🔌 Socket connected: ${socket.id}`);
