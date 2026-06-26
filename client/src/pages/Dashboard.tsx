@@ -44,16 +44,23 @@ export default function Dashboard() {
         <div className="flex gap-3">
           <button
             onClick={() => navigate("/workspaces")}
-            className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg"
+            className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg hover:bg-slate-800"
           >
             View
           </button>
 
           <button
             onClick={() => navigate("/workspaces/create")}
-            className="bg-blue-600 px-4 py-2 rounded-lg"
+            className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700"
           >
             + Create
+          </button>
+
+          <button
+            onClick={() => navigate("/chat")}
+            className="bg-green-600 px-4 py-2 rounded-lg hover:bg-green-700"
+          >
+            💬 Chat
           </button>
         </div>
       </div>
@@ -69,10 +76,10 @@ export default function Dashboard() {
             <div
               key={w.id}
               onClick={() => navigate(`/workspaces/${w.id}`)}
-              className="bg-slate-900 border border-slate-800 p-5 rounded-xl cursor-pointer hover:bg-slate-800"
+              className="bg-slate-900 border border-slate-800 p-5 rounded-xl cursor-pointer hover:bg-slate-800 transition"
             >
-              <h2 className="font-semibold">{w.name}</h2>
-              <p className="text-slate-400 text-sm">
+              <h2 className="font-semibold text-lg">{w.name}</h2>
+              <p className="text-slate-400 text-sm mt-2">
                 {w.description || "No description"}
               </p>
             </div>

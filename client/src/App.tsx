@@ -8,7 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import WorkspacePage from "./pages/workspaces/WorkspacePage";
 import CreateWorkspace from "./pages/workspaces/CreateWorkspacePage";
 import WorkspaceDetail from "./pages/workspaces/WorkspaceDetailsPage";
-
+import ChatPage from "./pages/ChatPage";
 import { socket } from "./socket";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -81,6 +81,14 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+  path="/chat"
+  element={
+    <ProtectedRoute>
+      <ChatPage />
+    </ProtectedRoute>
+  }
+/>
 
       {/* Default */}
       <Route path="/" element={<Navigate to="/login" replace />} />
