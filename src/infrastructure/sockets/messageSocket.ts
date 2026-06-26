@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { createMessage } from '../../application/services/messageService';
 import { logger } from '../logging/logger';
 import { SOCKET_EVENTS } from './socketEvents';
+import { WorkspaceModel } from '../database/models/Workspace';
+import { Types } from 'mongoose';
 
 interface DecodedToken {
   userId: string;
@@ -45,13 +47,38 @@ export const registerMessageHandlers = (io: SocketServer) => {
     logger.info(`🔌 Chat Socket connected: ${socket.id} (User: ${userId})`);
 
     // Handle join-workspace room join request
-    socket.on(SOCKET_EVENTS.JOIN_WORKSPACE, (workspaceId: string) => {
+    socket.on(SOCKET_EVENTS.JOIN_WORKSPACE, async (workspaceId: string) => {
       if (!workspaceId) {
         return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required to join' });
       }
-      socket.join(workspaceId);
-      logger.info(`🚪 User ${userId} joined room: ${workspaceId}`);
-      socket.to(workspaceId).emit(SOCKET_EVENTS.USER_JOINED, { userId });
+
+      if (!userId) {
+        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
+      }
+
+      try {
+        if (!Types.ObjectId.isValid(workspaceId)) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Invalid workspace ID' });
+        }
+
+        const workspace = await WorkspaceModel.findById(workspaceId);
+        if (!workspace) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace not found' });
+        }
+
+        const isMember = workspace.members.includes(userId) || workspace.ownerId === userId;
+        if (!isMember) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Access to this workspace is forbidden' });
+        }
+
+        socket.join(workspaceId);
+        logger.info(`🚪 User ${userId} joined room: ${workspaceId}`);
+        socket.to(workspaceId).emit(SOCKET_EVENTS.USER_JOINED, { userId });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to join workspace';
+        logger.error(`❌ Socket join-workspace error: ${errorMessage}`);
+        socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
+      }
     });
 
     // Handle leave-workspace room leave request
@@ -72,6 +99,21 @@ export const registerMessageHandlers = (io: SocketServer) => {
 
         if (!senderId) {
           return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
+        }
+
+        if (!Types.ObjectId.isValid(workspaceId)) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Invalid workspace ID' });
+        }
+
+        // Verify sender belongs to the workspace
+        const workspace = await WorkspaceModel.findById(workspaceId);
+        if (!workspace) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace not found' });
+        }
+
+        const isMember = workspace.members.includes(senderId) || workspace.ownerId === senderId;
+        if (!isMember) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Access to this workspace is forbidden' });
         }
 
         // Store message in MongoDB using the messageService
