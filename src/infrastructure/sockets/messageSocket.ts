@@ -137,6 +137,74 @@ export const registerMessageHandlers = (io: SocketServer) => {
       }
     });
 
+    // Handle typing-start event
+    socket.on(SOCKET_EVENTS.TYPING_START, async (workspaceId: string) => {
+      if (!workspaceId) {
+        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required for typing start' });
+      }
+
+      if (!userId) {
+        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
+      }
+
+      try {
+        if (!Types.ObjectId.isValid(workspaceId)) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Invalid workspace ID' });
+        }
+
+        const workspace = await WorkspaceModel.findById(workspaceId);
+        if (!workspace) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace not found' });
+        }
+
+        const isMember = workspace.members.includes(userId) || workspace.ownerId === userId;
+        if (!isMember) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Access to this workspace is forbidden' });
+        }
+
+        // Emit only to other users in the same workspace room
+        socket.to(workspaceId).emit(SOCKET_EVENTS.TYPING_START, { userId, workspaceId });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to handle typing start';
+        logger.error(`❌ Socket typing-start error: ${errorMessage}`);
+        socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
+      }
+    });
+
+    // Handle typing-stop event
+    socket.on(SOCKET_EVENTS.TYPING_STOP, async (workspaceId: string) => {
+      if (!workspaceId) {
+        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required for typing stop' });
+      }
+
+      if (!userId) {
+        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
+      }
+
+      try {
+        if (!Types.ObjectId.isValid(workspaceId)) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Invalid workspace ID' });
+        }
+
+        const workspace = await WorkspaceModel.findById(workspaceId);
+        if (!workspace) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace not found' });
+        }
+
+        const isMember = workspace.members.includes(userId) || workspace.ownerId === userId;
+        if (!isMember) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Access to this workspace is forbidden' });
+        }
+
+        // Emit only to other users in the same workspace room
+        socket.to(workspaceId).emit(SOCKET_EVENTS.TYPING_STOP, { userId, workspaceId });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to handle typing stop';
+        logger.error(`❌ Socket typing-stop error: ${errorMessage}`);
+        socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
+      }
+    });
+
     socket.on(SOCKET_EVENTS.DISCONNECT, (reason) => {
       logger.info(`🔌 Chat Socket disconnected: ${socket.id} (User: ${userId}). Reason: ${reason}`);
     });
