@@ -228,5 +228,77 @@ describe('Message Socket', () => {
         });
       });
     });
+
+    describe('typing-start', () => {
+      it('should allow member to emit typing-start and broadcast to room', async () => {
+        const workspaceId = '507f1f77bcf86cd799439011';
+        const mockWorkspace = {
+          _id: workspaceId,
+          ownerId: 'other-user',
+          members: [mockSocket.data.user.userId],
+        };
+
+        (WorkspaceModel.findById as jest.Mock).mockResolvedValue(mockWorkspace);
+
+        await eventListeners[SOCKET_EVENTS.TYPING_START](workspaceId);
+
+        expect(WorkspaceModel.findById).toHaveBeenCalledWith(workspaceId);
+        expect(mockSocket.to).toHaveBeenCalledWith(workspaceId);
+      });
+
+      it('should reject non-member from emitting typing-start', async () => {
+        const workspaceId = '507f1f77bcf86cd799439011';
+        const mockWorkspace = {
+          _id: workspaceId,
+          ownerId: 'other-user',
+          members: [],
+        };
+
+        (WorkspaceModel.findById as jest.Mock).mockResolvedValue(mockWorkspace);
+
+        await eventListeners[SOCKET_EVENTS.TYPING_START](workspaceId);
+
+        expect(mockSocket.to).not.toHaveBeenCalled();
+        expect(mockSocket.emit).toHaveBeenCalledWith(SOCKET_EVENTS.ERROR, {
+          message: 'Access to this workspace is forbidden',
+        });
+      });
+    });
+
+    describe('typing-stop', () => {
+      it('should allow member to emit typing-stop and broadcast to room', async () => {
+        const workspaceId = '507f1f77bcf86cd799439011';
+        const mockWorkspace = {
+          _id: workspaceId,
+          ownerId: 'other-user',
+          members: [mockSocket.data.user.userId],
+        };
+
+        (WorkspaceModel.findById as jest.Mock).mockResolvedValue(mockWorkspace);
+
+        await eventListeners[SOCKET_EVENTS.TYPING_STOP](workspaceId);
+
+        expect(WorkspaceModel.findById).toHaveBeenCalledWith(workspaceId);
+        expect(mockSocket.to).toHaveBeenCalledWith(workspaceId);
+      });
+
+      it('should reject non-member from emitting typing-stop', async () => {
+        const workspaceId = '507f1f77bcf86cd799439011';
+        const mockWorkspace = {
+          _id: workspaceId,
+          ownerId: 'other-user',
+          members: [],
+        };
+
+        (WorkspaceModel.findById as jest.Mock).mockResolvedValue(mockWorkspace);
+
+        await eventListeners[SOCKET_EVENTS.TYPING_STOP](workspaceId);
+
+        expect(mockSocket.to).not.toHaveBeenCalled();
+        expect(mockSocket.emit).toHaveBeenCalledWith(SOCKET_EVENTS.ERROR, {
+          message: 'Access to this workspace is forbidden',
+        });
+      });
+    });
   });
 });
