@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../api/axios";
+import { socket } from "../socket/socket";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -22,9 +23,9 @@ export default function Login() {
         password,
       });
 
-      console.log("LOGIN RESPONSE:", res.data); // DEBUG
+      console.log("LOGIN RESPONSE:", res.data);
 
-      // ✅ SAFE TOKEN HANDLING (FIXES ALL BACKEND SHAPES)
+      // Safe token handling
       const token =
         res.data?.token ||
         res.data?.data?.token ||
@@ -35,17 +36,35 @@ export default function Login() {
         return;
       }
 
+      // Save JWT
       localStorage.setItem("token", token);
 
       console.log("TOKEN SAVED:", token);
 
-      // small delay ensures state update + route sync
+      // Pass token for socket authentication
+      socket.auth = {
+        token,
+      };
+
+      // Connect to Socket.IO server
+      if (!socket.connected) {
+        socket.connect();
+      }
+
+      console.log("Socket connection initiated");
+
+      // Navigate to dashboard
       setTimeout(() => {
         navigate("/dashboard");
       }, 100);
 
     } catch (err: any) {
-      setError(err.response?.data?.message || "Login failed");
+      console.error(err);
+
+      setError(
+        err.response?.data?.message ||
+        "Login failed. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -67,17 +86,19 @@ export default function Login() {
           <input
             type="email"
             placeholder="Email"
-            className="w-full p-3 mb-4 rounded-lg bg-slate-800 text-white border border-slate-700"
+            className="w-full p-3 mb-4 rounded-lg bg-slate-800 text-white border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
 
           <input
             type="password"
             placeholder="Password"
-            className="w-full p-3 mb-4 rounded-lg bg-slate-800 text-white border border-slate-700"
+            className="w-full p-3 mb-4 rounded-lg bg-slate-800 text-white border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
           />
 
           {error && (
@@ -89,7 +110,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-semibold"
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white p-3 rounded-lg font-semibold transition"
           >
             {loading ? "Signing In..." : "Login"}
           </button>
@@ -97,10 +118,14 @@ export default function Login() {
 
         <p className="text-slate-400 text-center mt-6">
           Don't have an account?{" "}
-          <Link to="/register" className="text-blue-400">
+          <Link
+            to="/register"
+            className="text-blue-400 hover:text-blue-300 transition"
+          >
             Register
           </Link>
         </p>
+
       </div>
     </div>
   );

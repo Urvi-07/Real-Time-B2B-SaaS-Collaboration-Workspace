@@ -1,58 +1,84 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import api from "../../api/axios";
+
+interface Workspace {
+  id: string;
+  name: string;
+  description?: string;
+}
 
 export default function WorkspaceDetailsPage() {
   const { id } = useParams();
-  const [workspace, setWorkspace] = useState<any>(null);
+  const navigate = useNavigate();
+
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchWorkspace = async () => {
       try {
         const res = await api.get(`/workspaces/${id}`);
-        setWorkspace(res.data);
-      } catch {
+        setWorkspace(res.data?.data || res.data);
+      } catch (error) {
+        console.error(error);
         setWorkspace(null);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchData();
+    fetchWorkspace();
   }, [id]);
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        background: "radial-gradient(circle at top, #0f172a, #020617)",
-        fontFamily: "Arial",
-        color: "white",
-      }}
-    >
-      <div
-        style={{
-          width: "420px",
-          background: "rgba(255,255,255,0.06)",
-          borderRadius: "16px",
-          padding: "25px",
-          border: "1px solid rgba(255,255,255,0.1)",
-          backdropFilter: "blur(12px)",
-        }}
-      >
-        <h2>Workspace Details</h2>
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+      <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-8">
 
-        {!workspace ? (
-          <p style={{ color: "#94a3b8" }}>Loading...</p>
+        <h1 className="text-3xl font-bold text-white mb-2">
+          Workspace Details
+        </h1>
+
+        <p className="text-slate-400 mb-8">
+          View workspace information and collaborate with your team.
+        </p>
+
+        {loading ? (
+          <p className="text-slate-400">Loading workspace...</p>
+        ) : !workspace ? (
+          <p className="text-red-400">Workspace not found.</p>
         ) : (
           <>
-            <h3>{workspace.name}</h3>
-            <p style={{ color: "#94a3b8" }}>
-              {workspace.description || "No description"}
-            </p>
+            <div className="bg-slate-800 rounded-xl p-5 mb-6">
+              <h2 className="text-2xl font-semibold text-white">
+                {workspace.name}
+              </h2>
+
+              <p className="text-slate-400 mt-3">
+                {workspace.description || "No description available."}
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+
+              <button
+                onClick={() => navigate("/workspaces")}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg transition"
+              >
+                ← Back
+              </button>
+
+              <button
+                onClick={() => navigate("/chat")}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg transition"
+              >
+                💬 Open Chat
+              </button>
+
+            </div>
           </>
         )}
+
       </div>
     </div>
   );

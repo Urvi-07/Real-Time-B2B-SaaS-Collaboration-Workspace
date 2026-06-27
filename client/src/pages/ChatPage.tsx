@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { socket } from "../socket";
+import { useEffect, useRef, useState } from "react";
+import { socket } from "../socket/socket";
 
 interface Message {
   sender: string;
@@ -10,107 +10,173 @@ interface Message {
 export default function ChatPage() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(socket.connected);
+
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    socket.connect();
-
-    socket.on("connect", () => {
+    const handleConnect = () => {
+      console.log("✅ Socket Connected");
       setConnected(true);
-    });
+    };
 
-    socket.on("disconnect", () => {
+    const handleDisconnect = () => {
+      console.log("❌ Socket Disconnected");
       setConnected(false);
-    });
+    };
 
-    socket.on("receive_message", (data: Message) => {
+    const handleReceiveMessage = (data: Message) => {
       setMessages((prev) => [...prev, data]);
-    });
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("receive_message", handleReceiveMessage);
+
+    setConnected(socket.connected);
 
     return () => {
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.off("receive_message");
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("receive_message", handleReceiveMessage);
     };
   }, []);
 
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
+  }, [messages]);
+
   const handleSend = () => {
-    if (!message.trim()) return;
+    if (!message.trim() || !connected) return;
 
     const newMessage: Message = {
       sender: "You",
       text: message,
-      time: new Date().toLocaleTimeString(),
+      time: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     };
 
-    // Show instantly in UI
+    // Show instantly
     setMessages((prev) => [...prev, newMessage]);
 
-    // Send to backend (works when backend events are ready)
+    // Send to backend
     socket.emit("send_message", newMessage);
 
     setMessage("");
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex justify-center items-center p-6">
-      <div className="bg-slate-900 w-full max-w-3xl h-[80vh] rounded-xl shadow-lg flex flex-col border border-slate-800">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+
+      <div className="w-full max-w-5xl h-[85vh] bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 flex flex-col">
 
         {/* Header */}
-        <div className="bg-blue-600 text-white p-4 rounded-t-xl flex justify-between items-center">
-          <h2 className="text-xl font-bold">💬 Workspace Chat</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900 rounded-t-2xl">
 
-          <span
-            className={`text-sm px-3 py-1 rounded-full ${
-              connected ? "bg-green-500" : "bg-red-500"
+          <div>
+            <h1 className="text-2xl font-bold text-white">
+              💬 Workspace Chat
+            </h1>
+
+            <p className="text-slate-400 text-sm">
+              Collaborate with your teammates in real time
+            </p>
+          </div>
+
+          <div
+            className={`px-4 py-2 rounded-full text-sm font-semibold ${
+              connected
+                ? "bg-green-600 text-white"
+                : "bg-red-600 text-white"
             }`}
           >
-            {connected ? "Connected" : "Disconnected"}
-          </span>
+            {connected ? "🟢 Connected" : "🔴 Disconnected"}
+          </div>
+
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-950">
+
           {messages.length === 0 ? (
-            <p className="text-slate-400 text-center mt-10">
-              No messages yet.
-            </p>
+            <div className="h-full flex items-center justify-center text-slate-500 text-lg">
+              Start the conversation 👋
+            </div>
           ) : (
-            messages.map((msg, index) => (
-              <div
-                key={index}
-                className="bg-blue-600 text-white rounded-lg p-3 max-w-sm"
-              >
-                <p className="font-semibold">{msg.sender}</p>
-                <p>{msg.text}</p>
-                <p className="text-xs text-blue-100 mt-1">
-                  {msg.time}
-                </p>
-              </div>
-            ))
+            messages.map((msg, index) => {
+              const isMe = msg.sender === "You";
+
+              return (
+                <div
+                  key={index}
+                  className={`flex ${
+                    isMe ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  <div
+                    className={`max-w-sm md:max-w-md px-4 py-3 rounded-2xl shadow-lg ${
+                      isMe
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-800 text-white"
+                    }`}
+                  >
+                    <p className="font-semibold text-sm">
+                      {msg.sender}
+                    </p>
+
+                    <p className="mt-2 break-words">
+                      {msg.text}
+                    </p>
+
+                    <p className="text-xs mt-2 text-right text-slate-300">
+                      {msg.time}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
           )}
+
+          <div ref={bottomRef}></div>
+
         </div>
 
         {/* Input */}
-        <div className="border-t border-slate-700 p-4 flex gap-2">
-          <input
-            type="text"
-            className="flex-1 bg-slate-800 text-white border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Type your message..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          />
+        <div className="border-t border-slate-800 p-5 bg-slate-900 rounded-b-2xl">
 
-          <button
-            onClick={handleSend}
-            disabled={!connected}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-5 rounded-lg"
-          >
-            Send
-          </button>
+          <div className="flex gap-3">
+
+            <input
+              type="text"
+              placeholder="Type your message..."
+              className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleSend();
+                }
+              }}
+            />
+
+            <button
+              onClick={handleSend}
+              disabled={!connected}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 text-white font-semibold px-8 rounded-xl transition"
+            >
+              Send
+            </button>
+
+          </div>
+
         </div>
+
       </div>
+
     </div>
   );
 }

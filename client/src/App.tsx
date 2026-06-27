@@ -9,7 +9,8 @@ import WorkspacePage from "./pages/workspaces/WorkspacePage";
 import CreateWorkspace from "./pages/workspaces/CreateWorkspacePage";
 import WorkspaceDetail from "./pages/workspaces/WorkspaceDetailsPage";
 import ChatPage from "./pages/ChatPage";
-import { socket } from "./socket";
+
+import { socket } from "./socket/socket";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem("token");
@@ -21,31 +22,34 @@ export default function App() {
   useEffect(() => {
     const token = localStorage.getItem("token");
 
-    if (token) {
+    if (token && !socket.connected) {
       socket.connect();
-
-      socket.on("connect", () => {
-        console.log("✅ Socket Connected:", socket.id);
-      });
-
-      socket.on("disconnect", () => {
-        console.log("❌ Socket Disconnected");
-      });
     }
 
+    const handleConnect = () => {
+      console.log("✅ Socket Connected:", socket.id);
+    };
+
+    const handleDisconnect = () => {
+      console.log("❌ Socket Disconnected");
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+
     return () => {
-      socket.off("connect");
-      socket.off("disconnect");
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
     };
   }, []);
 
   return (
     <Routes>
-      {/* Public */}
+      {/* Public Routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      {/* Protected */}
+      {/* Protected Routes */}
       <Route
         path="/dashboard"
         element={
@@ -81,19 +85,20 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
-  path="/chat"
-  element={
-    <ProtectedRoute>
-      <ChatPage />
-    </ProtectedRoute>
-  }
-/>
+        path="/chat"
+        element={
+          <ProtectedRoute>
+            <ChatPage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Default */}
       <Route path="/" element={<Navigate to="/login" replace />} />
 
-      {/* Catch all */}
+      {/* Catch All */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
