@@ -10,6 +10,8 @@ export const SOCKET_EVENTS = {
   USER_LEFT: 'user-left',
   DISCONNECT: 'disconnect',
   ERROR: 'error',
+  TYPING_START: 'typing-start',
+  TYPING_STOP: 'typing-stop',
 } as const;
 
 export type SocketEvent = typeof SOCKET_EVENTS[keyof typeof SOCKET_EVENTS];
