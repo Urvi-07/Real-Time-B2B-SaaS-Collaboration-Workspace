@@ -74,6 +74,7 @@ export class SocketService {
 
     this.io.on('connection', (socket: Socket) => {
       const authSocket = socket as AuthenticatedSocket;
+      const joinedWorkspaces = new Set<string>();
 
       logger.info(
         `Socket connected: ${authSocket.id} as ${authSocket.data.user.email}`
@@ -102,6 +103,7 @@ export class SocketService {
 
         const roomId = workspaceId.trim();
         authSocket.join(roomId);
+        joinedWorkspaces.add(roomId);
 
         logger.info(
           `User ${authSocket.data.user.email} joined workspace room: ${roomId}`
@@ -140,6 +142,7 @@ export class SocketService {
         });
 
         authSocket.leave(roomId);
+        joinedWorkspaces.delete(roomId);
 
         logger.info(
           `User ${authSocket.data.user.email} left workspace room: ${roomId}`
@@ -219,6 +222,15 @@ export class SocketService {
       });
 
       authSocket.on('disconnect', (reason) => {
+        joinedWorkspaces.forEach((workspaceId) => {
+          authSocket.to(workspaceId).emit('user-left', {
+            workspaceId,
+            userId: authSocket.data.user.id,
+            email: authSocket.data.user.email,
+            leftAt: Date.now(),
+          });
+        });
+
         logger.info(
           `Socket disconnected: ${authSocket.id} | User: ${authSocket.data.user.email} | Reason: ${reason}`
         );
