@@ -11,6 +11,7 @@ import WorkspaceDetail from "./pages/workspaces/WorkspaceDetailsPage";
 import ChatPage from "./pages/ChatPage";
 
 import { socket } from "./socket/socket";
+import Home from "./pages/Home";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = localStorage.getItem("token");
@@ -96,7 +97,7 @@ export default function App() {
       />
 
       {/* Default */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<Home />} />
 
       {/* Catch All */}
       <Route path="*" element={<Navigate to="/login" replace />} />
