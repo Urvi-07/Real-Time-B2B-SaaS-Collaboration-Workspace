@@ -25,38 +25,38 @@ export default function Login() {
 
       console.log("LOGIN RESPONSE:", res.data);
 
-      // Safe token handling
+      // Get token from backend response
       const token =
         res.data?.token ||
         res.data?.data?.token ||
         res.data?.accessToken;
 
       if (!token) {
-        setError("Login failed: Token not received from backend");
+        setError("Login failed: Token not received from backend.");
         return;
       }
 
-      // Save JWT
+      // Save token
       localStorage.setItem("token", token);
 
-      console.log("TOKEN SAVED:", token);
+      console.log("✅ Token saved");
 
-      // Pass token for socket authentication
+      // Update socket authentication
       socket.auth = {
         token,
       };
 
-      // Connect to Socket.IO server
-      if (!socket.connected) {
-        socket.connect();
+      // Reconnect socket with latest auth
+      if (socket.connected) {
+        socket.disconnect();
       }
 
-      console.log("Socket connection initiated");
+      socket.connect();
 
-      // Navigate to dashboard
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 100);
+      console.log("🔌 Connecting to Socket.IO server...");
+
+      // Navigate after login
+      navigate("/dashboard");
 
     } catch (err: any) {
       console.error(err);

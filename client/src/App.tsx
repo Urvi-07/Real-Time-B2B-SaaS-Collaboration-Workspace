@@ -24,8 +24,12 @@ export default function App() {
     const token = localStorage.getItem("token");
 
     if (token && !socket.connected) {
-      socket.connect();
-    }
+  socket.auth = {
+    token,
+  };
+
+  socket.connect();
+}
 
     const handleConnect = () => {
       console.log("✅ Socket Connected:", socket.id);
@@ -88,13 +92,13 @@ export default function App() {
       />
 
       <Route
-        path="/chat"
-        element={
-          <ProtectedRoute>
-            <ChatPage />
-          </ProtectedRoute>
-        }
-      />
+  path="/workspaces/:id/chat"
+  element={
+    <ProtectedRoute>
+      <ChatPage />
+    </ProtectedRoute>
+  }
+/>
 
       {/* Default */}
       <Route path="/" element={<Home />} />
