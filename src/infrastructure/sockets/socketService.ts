@@ -3,6 +3,8 @@ import { Server as SocketServer, Socket } from 'socket.io';
 import { logger } from '../logging/logger';
 import { config } from '../config/config';
 import { registerMessageHandlers } from './messageSocket';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { connectRedis } from '../redis/redisClient';
 
 export class SocketService {
   private static io: SocketServer | null = null;
@@ -21,6 +23,22 @@ export class SocketService {
       pingTimeout: 60000,
       pingInterval: 25000,
     });
+
+    try {
+      logger.info('⏳ Initializing Redis Socket.IO Adapter...');
+      const pubClient = connectRedis();
+      const subClient = pubClient.duplicate();
+
+      subClient.on('error', (err) => {
+        logger.error(`❌ Redis Socket.IO adapter subClient error: ${err.message}`);
+      });
+
+      this.io.adapter(createAdapter(pubClient, subClient));
+      logger.info('🚀 Socket.io Redis Adapter initialized successfully');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`💥 Failed to initialize Redis Socket.IO Adapter: ${errorMessage}`);
+    }
 
     logger.info('🚀 Socket.io Server initialized');
 
