@@ -11,13 +11,27 @@ interface DecodedToken {
   email: string;
 }
 
-/**
- * Registers message-related real-time Socket.io event handlers and authentication middleware.
- * 
- * @param io The initialized Socket.io Server instance.
- */
+const isWorkspaceMember = async (workspaceId: string, userId: string) => {
+  if (!Types.ObjectId.isValid(workspaceId)) {
+    return { allowed: false, message: 'Invalid workspace ID' };
+  }
+
+  const workspace = await WorkspaceModel.findById(workspaceId);
+
+  if (!workspace) {
+    return { allowed: false, message: 'Workspace not found' };
+  }
+
+  const isMember = workspace.members.includes(userId) || workspace.ownerId === userId;
+
+  if (!isMember) {
+    return { allowed: false, message: 'Access to this workspace is forbidden' };
+  }
+
+  return { allowed: true };
+};
+
 export const registerMessageHandlers = (io: SocketServer) => {
-  // Middleware to authenticate socket connections using JWT tokens
   io.use((socket, next) => {
     const token =
       socket.handshake.auth?.token ||
@@ -33,6 +47,7 @@ export const registerMessageHandlers = (io: SocketServer) => {
         token,
         process.env.JWT_SECRET || 'default_secret'
       ) as DecodedToken;
+
       socket.data.user = decoded;
       next();
     } catch (err) {
@@ -44,9 +59,9 @@ export const registerMessageHandlers = (io: SocketServer) => {
 
   io.on('connection', (socket: Socket) => {
     const userId = socket.data.user?.userId;
+
     logger.info(`🔌 Chat Socket connected: ${socket.id} (User: ${userId})`);
 
-    // Handle join-workspace room join request
     socket.on(SOCKET_EVENTS.JOIN_WORKSPACE, async (workspaceId: string) => {
       if (!workspaceId) {
         return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required to join' });
@@ -57,21 +72,14 @@ export const registerMessageHandlers = (io: SocketServer) => {
       }
 
       try {
-        if (!Types.ObjectId.isValid(workspaceId)) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Invalid workspace ID' });
-        }
+        const access = await isWorkspaceMember(workspaceId, userId);
 
-        const workspace = await WorkspaceModel.findById(workspaceId);
-        if (!workspace) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace not found' });
-        }
-
-        const isMember = workspace.members.includes(userId) || workspace.ownerId === userId;
-        if (!isMember) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Access to this workspace is forbidden' });
+        if (!access.allowed) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
         }
 
         socket.join(workspaceId);
+
         logger.info(`🚪 User ${userId} joined room: ${workspaceId}`);
         socket.to(workspaceId).emit(SOCKET_EVENTS.USER_JOINED, { userId });
       } catch (error) {
@@ -81,17 +89,17 @@ export const registerMessageHandlers = (io: SocketServer) => {
       }
     });
 
-    // Handle leave-workspace room leave request
     socket.on(SOCKET_EVENTS.LEAVE_WORKSPACE, (workspaceId: string) => {
       if (!workspaceId) {
         return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required to leave' });
       }
+
       socket.leave(workspaceId);
+
       logger.info(`🚪 User ${userId} left room: ${workspaceId}`);
       socket.to(workspaceId).emit(SOCKET_EVENTS.USER_LEFT, { userId });
     });
 
-    // Handle send-message payload request from client
     socket.on(SOCKET_EVENTS.SEND_MESSAGE, async (data: { workspaceId: string; content: string }) => {
       try {
         const { workspaceId, content } = data;
@@ -101,25 +109,26 @@ export const registerMessageHandlers = (io: SocketServer) => {
           return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
         }
 
-        if (!Types.ObjectId.isValid(workspaceId)) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Invalid workspace ID' });
+        if (!workspaceId || !content) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID and content are required' });
         }
 
-        // Verify sender belongs to the workspace
-        const workspace = await WorkspaceModel.findById(workspaceId);
-        if (!workspace) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace not found' });
+        if (content.trim().length === 0) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Message content cannot be empty' });
         }
 
-        const isMember = workspace.members.includes(senderId) || workspace.ownerId === senderId;
-        if (!isMember) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Access to this workspace is forbidden' });
+        if (content.trim().length > 1000) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Message content cannot exceed 1000 characters' });
         }
 
-        // Store message in MongoDB using the messageService
-        const savedMessage = await createMessage(workspaceId, senderId, content);
+        const access = await isWorkspaceMember(workspaceId, senderId);
 
-        // Broadcast the saved message to all users in the same workspace room (including the sender)
+        if (!access.allowed) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
+        }
+
+        const savedMessage = await createMessage(workspaceId, senderId, content.trim());
+
         io.to(workspaceId).emit(SOCKET_EVENTS.BROADCAST_MESSAGE, savedMessage);
         logger.debug(`📤 Broadcasted message in workspace ${workspaceId} from user ${senderId}`);
       } catch (error) {
@@ -129,15 +138,32 @@ export const registerMessageHandlers = (io: SocketServer) => {
       }
     });
 
-    // Handle custom broadcast-message triggers directly
-    socket.on(SOCKET_EVENTS.BROADCAST_MESSAGE, (data: { workspaceId: string; message: unknown }) => {
+    socket.on(SOCKET_EVENTS.BROADCAST_MESSAGE, async (data: { workspaceId: string; message: unknown }) => {
       const { workspaceId, message } = data;
-      if (workspaceId && message) {
+
+      if (!userId) {
+        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
+      }
+
+      if (!workspaceId || !message) {
+        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID and message are required' });
+      }
+
+      try {
+        const access = await isWorkspaceMember(workspaceId, userId);
+
+        if (!access.allowed) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
+        }
+
         socket.to(workspaceId).emit(SOCKET_EVENTS.BROADCAST_MESSAGE, message);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to broadcast message';
+        logger.error(`❌ Socket broadcast-message error: ${errorMessage}`);
+        socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
       }
     });
 
-    // Handle typing-start event
     socket.on(SOCKET_EVENTS.TYPING_START, async (workspaceId: string) => {
       if (!workspaceId) {
         return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required for typing start' });
@@ -148,21 +174,12 @@ export const registerMessageHandlers = (io: SocketServer) => {
       }
 
       try {
-        if (!Types.ObjectId.isValid(workspaceId)) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Invalid workspace ID' });
+        const access = await isWorkspaceMember(workspaceId, userId);
+
+        if (!access.allowed) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
         }
 
-        const workspace = await WorkspaceModel.findById(workspaceId);
-        if (!workspace) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace not found' });
-        }
-
-        const isMember = workspace.members.includes(userId) || workspace.ownerId === userId;
-        if (!isMember) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Access to this workspace is forbidden' });
-        }
-
-        // Emit only to other users in the same workspace room
         socket.to(workspaceId).emit(SOCKET_EVENTS.TYPING_START, { userId, workspaceId });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to handle typing start';
@@ -171,7 +188,6 @@ export const registerMessageHandlers = (io: SocketServer) => {
       }
     });
 
-    // Handle typing-stop event
     socket.on(SOCKET_EVENTS.TYPING_STOP, async (workspaceId: string) => {
       if (!workspaceId) {
         return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required for typing stop' });
@@ -182,21 +198,12 @@ export const registerMessageHandlers = (io: SocketServer) => {
       }
 
       try {
-        if (!Types.ObjectId.isValid(workspaceId)) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Invalid workspace ID' });
+        const access = await isWorkspaceMember(workspaceId, userId);
+
+        if (!access.allowed) {
+          return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
         }
 
-        const workspace = await WorkspaceModel.findById(workspaceId);
-        if (!workspace) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace not found' });
-        }
-
-        const isMember = workspace.members.includes(userId) || workspace.ownerId === userId;
-        if (!isMember) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Access to this workspace is forbidden' });
-        }
-
-        // Emit only to other users in the same workspace room
         socket.to(workspaceId).emit(SOCKET_EVENTS.TYPING_STOP, { userId, workspaceId });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to handle typing stop';
