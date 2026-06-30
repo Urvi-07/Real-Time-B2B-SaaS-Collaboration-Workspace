@@ -78,9 +78,11 @@ describe('Message Service', () => {
       ];
 
       const mockQuery = {
+        select: jest.fn().mockReturnThis(),
         sort: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue(mockDocs),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue(mockDocs),
       };
 
       (MessageModel.countDocuments as jest.Mock).mockResolvedValue(2);
@@ -94,9 +96,11 @@ describe('Message Service', () => {
       expect(MessageModel.find).toHaveBeenCalledWith({
         workspaceId: new Types.ObjectId(validWorkspaceId),
       });
+      expect(mockQuery.select).toHaveBeenCalledWith('_id workspaceId senderId content createdAt updatedAt');
       expect(mockQuery.sort).toHaveBeenCalledWith({ createdAt: 1 });
       expect(mockQuery.skip).toHaveBeenCalledWith(0);
       expect(mockQuery.limit).toHaveBeenCalledWith(2);
+      expect(mockQuery.lean).toHaveBeenCalled();
       expect(result.total).toBe(2);
       expect(result.messages.length).toBe(2);
       expect(result.messages[0].content).toBe('First Msg');

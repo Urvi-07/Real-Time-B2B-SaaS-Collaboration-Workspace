@@ -1,14 +1,23 @@
-import { MessageModel, IMessageDocument } from '../../infrastructure/database/models/Message';
+import { MessageModel } from '../../infrastructure/database/models/Message';
 import { IMessage } from '../../domain/interfaces/IMessage';
 import { Types } from 'mongoose';
 import { BadRequestError } from '../../infrastructure/errors/AppError';
 
+interface IMessageDoc {
+  _id: Types.ObjectId | string;
+  workspaceId: Types.ObjectId | string;
+  senderId: Types.ObjectId | string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /**
- * Converts a database Mongoose document to a database-agnostic domain entity.
+ * Converts a database Mongoose document or plain object to a database-agnostic domain entity.
  */
-const mapToDomain = (doc: IMessageDocument): IMessage => {
+const mapToDomain = (doc: IMessageDoc): IMessage => {
   return {
-    id: (doc._id as Types.ObjectId).toString(),
+    id: doc._id.toString(),
     workspaceId: doc.workspaceId.toString(),
     senderId: doc.senderId.toString(),
     content: doc.content,
@@ -69,9 +78,11 @@ export const getWorkspaceMessages = async (
   const [total, docs] = await Promise.all([
     MessageModel.countDocuments(query),
     MessageModel.find(query)
+      .select('_id workspaceId senderId content createdAt updatedAt')
       .sort({ createdAt: 1 })
       .skip((page - 1) * limit)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
   ]);
 
   return {
