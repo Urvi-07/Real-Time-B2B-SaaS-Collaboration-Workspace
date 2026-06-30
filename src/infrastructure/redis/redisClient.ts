@@ -62,3 +62,39 @@ export const disconnectRedis = async (): Promise<void> => {
     }
   }
 };
+
+/**
+ * Utility function to wait for a Redis client to transition to the 'ready' state.
+ * Rejects if the timeout is reached or an error event is received.
+ */
+export const waitForRedis = (client: Redis, timeoutMs = 5000): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (client.status === 'ready') {
+      return resolve();
+    }
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Redis connection timeout after ${timeoutMs}ms (current status: ${client.status})`));
+    }, timeoutMs);
+
+    const onReady = () => {
+      cleanup();
+      resolve();
+    };
+
+    const onError = (err: Error) => {
+      cleanup();
+      reject(err);
+    };
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      client.off('ready', onReady);
+      client.off('error', onError);
+    };
+
+    client.once('ready', onReady);
+    client.once('error', onError);
+  });
+};
