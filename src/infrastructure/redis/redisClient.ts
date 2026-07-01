@@ -12,18 +12,29 @@ export const connectRedis = (): Redis => {
     return redisClient;
   }
 
-  const redisHost = process.env.REDIS_HOST || '127.0.0.1';
-  const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
-  const redisPassword = process.env.REDIS_PASSWORD;
+  const redisUrl = process.env.REDIS_URL || process.env.REDIS_TLS_URL;
 
-  logger.info(`⏳ Connecting to Redis at ${redisHost}:${redisPort}...`);
+  if (redisUrl) {
+    logger.info('⏳ Connecting to Redis via connection URL...');
+    const isTls = redisUrl.startsWith('rediss://');
+    redisClient = new Redis(redisUrl, {
+      maxRetriesPerRequest: null,
+      ...(isTls ? { tls: { rejectUnauthorized: false } } : {}),
+    });
+  } else {
+    const redisHost = process.env.REDIS_HOST || '127.0.0.1';
+    const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
+    const redisPassword = process.env.REDIS_PASSWORD;
 
-  redisClient = new Redis({
-    host: redisHost,
-    port: redisPort,
-    password: redisPassword,
-    maxRetriesPerRequest: null, // Essential setting for Socket.io adapter support
-  });
+    logger.info(`⏳ Connecting to Redis at ${redisHost}:${redisPort}...`);
+
+    redisClient = new Redis({
+      host: redisHost,
+      port: redisPort,
+      password: redisPassword,
+      maxRetriesPerRequest: null, // Essential setting for Socket.io adapter support
+    });
+  }
 
   redisClient.on('connect', () => {
     logger.info('🚀 Redis client connected successfully');
