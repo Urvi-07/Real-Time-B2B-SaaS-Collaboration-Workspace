@@ -78,6 +78,12 @@ export const registerMessageHandlers = (io: SocketServer) => {
           return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
         }
 
+        if (socket.rooms.has(workspaceId)) {
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: 'Already connected to this workspace',
+          });
+        }
+
         socket.join(workspaceId);
 
         logger.info(`🚪 User ${userId} joined room: ${workspaceId}`);
@@ -92,6 +98,12 @@ export const registerMessageHandlers = (io: SocketServer) => {
     socket.on(SOCKET_EVENTS.LEAVE_WORKSPACE, (workspaceId: string) => {
       if (!workspaceId) {
         return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required to leave' });
+      }
+
+      if (!socket.rooms.has(workspaceId)) {
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'You are not connected to this workspace',
+        });
       }
 
       socket.leave(workspaceId);
@@ -127,6 +139,12 @@ export const registerMessageHandlers = (io: SocketServer) => {
           return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
         }
 
+        if (!socket.rooms.has(workspaceId)) {
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: 'Join the workspace before sending messages',
+          });
+        }
+
         const savedMessage = await createMessage(workspaceId, senderId, content.trim());
 
         io.to(workspaceId).emit(SOCKET_EVENTS.BROADCAST_MESSAGE, savedMessage);
@@ -156,6 +174,12 @@ export const registerMessageHandlers = (io: SocketServer) => {
           return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
         }
 
+        if (!socket.rooms.has(workspaceId)) {
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: 'Join the workspace before broadcasting messages',
+          });
+        }
+
         socket.to(workspaceId).emit(SOCKET_EVENTS.BROADCAST_MESSAGE, message);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to broadcast message';
@@ -180,6 +204,12 @@ export const registerMessageHandlers = (io: SocketServer) => {
           return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
         }
 
+        if (!socket.rooms.has(workspaceId)) {
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: 'Join the workspace before sending typing status',
+          });
+        }
+
         socket.to(workspaceId).emit(SOCKET_EVENTS.TYPING_START, { userId, workspaceId });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to handle typing start';
@@ -202,6 +232,12 @@ export const registerMessageHandlers = (io: SocketServer) => {
 
         if (!access.allowed) {
           return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
+        }
+
+        if (!socket.rooms.has(workspaceId)) {
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: 'Join the workspace before sending typing status',
+          });
         }
 
         socket.to(workspaceId).emit(SOCKET_EVENTS.TYPING_STOP, { userId, workspaceId });
