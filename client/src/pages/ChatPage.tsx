@@ -163,61 +163,71 @@ export default function ChatPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-950">
+<div className="flex-1 overflow-y-auto p-6 bg-slate-950 space-y-4">
 
-          {messages.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-slate-500">
-              No messages yet 👋
-            </div>
-          ) : (
-            messages.map((msg, index) => {
-              const isMe = msg.sender?.name === "You";
+  {messages.length === 0 ? (
+    <div className="h-full flex flex-col items-center justify-center text-slate-500">
+      <div className="text-6xl mb-4">💬</div>
+      <p className="text-lg">No messages yet</p>
+      <p className="text-sm mt-2">
+        Start the conversation with your teammates.
+      </p>
+    </div>
+  ) : (
+    messages.map((msg, index) => {
+      const isMe = msg.sender?.name === "You";
 
-              return (
-                <div
-                  key={msg._id || index}
-                  className={`flex ${
-                    isMe ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-md rounded-2xl px-4 py-3 shadow ${
-                      isMe
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-800 text-white"
-                    }`}
-                  >
-                    <p className="font-semibold text-sm">
-                      {msg.sender?.name || "User"}
-                    </p>
+      return (
+        <div
+          key={msg._id || index}
+          className={`flex ${
+            isMe ? "justify-end" : "justify-start"
+          }`}
+        >
+          <div
+            className={`max-w-[75%] px-4 py-3 rounded-2xl shadow-lg transition-all duration-200 ${
+              isMe
+                ? "bg-blue-600 rounded-br-md"
+                : "bg-slate-800 rounded-bl-md"
+            }`}
+          >
+            {!isMe && (
+              <p className="text-xs font-semibold text-blue-400 mb-1">
+                {msg.sender?.name || "User"}
+              </p>
+            )}
 
-                    <p className="mt-2 break-words">
-                      {msg.content}
-                    </p>
-
-                    <p className="text-xs text-right mt-2 opacity-70">
-                      {msg.createdAt
-                        ? new Date(msg.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                        : ""}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
-          )}
-
-          {typing && (
-            <p className="text-green-400 italic">
-              Someone is typing...
+            <p className="text-white break-words">
+              {msg.content}
             </p>
-          )}
 
-          <div ref={bottomRef}></div>
-
+            <p className="text-[10px] text-right mt-2 opacity-70">
+              {msg.createdAt
+                ? new Date(msg.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : ""}
+            </p>
+          </div>
         </div>
+      );
+    })
+  )}
+
+  {typing && (
+    <div className="flex justify-start">
+      <div className="bg-slate-800 px-4 py-2 rounded-xl">
+        <p className="text-green-400 text-sm animate-pulse">
+          Someone is typing...
+        </p>
+      </div>
+    </div>
+  )}
+
+  <div ref={bottomRef}></div>
+
+</div>
 
         {/* Input */}
         <div className="border-t border-slate-800 p-5">
