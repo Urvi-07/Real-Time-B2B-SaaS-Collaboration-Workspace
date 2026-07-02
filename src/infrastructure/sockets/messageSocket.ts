@@ -22,10 +22,14 @@ const isWorkspaceMember = async (workspaceId: string, userId: string) => {
     return { allowed: false, message: 'Workspace not found' };
   }
 
-  const isMember = workspace.members.includes(userId) || workspace.ownerId === userId;
+  const isMember =
+    workspace.members.includes(userId) || workspace.ownerId === userId;
 
   if (!isMember) {
-    return { allowed: false, message: 'Access to this workspace is forbidden' };
+    return {
+      allowed: false,
+      message: 'Access to this workspace is forbidden',
+    };
   }
 
   return { allowed: true };
@@ -38,7 +42,9 @@ export const registerMessageHandlers = (io: SocketServer) => {
       socket.handshake.headers?.authorization?.split(' ')[1];
 
     if (!token) {
-      logger.warn(`🔌 Connection rejected: No authentication token provided. Socket: ${socket.id}`);
+      logger.warn(
+        `🔌 Connection rejected: No authentication token provided. Socket: ${socket.id}`
+      );
       return next(new Error('Authentication error: No token provided'));
     }
 
@@ -52,7 +58,9 @@ export const registerMessageHandlers = (io: SocketServer) => {
       next();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      logger.warn(`🔌 Connection rejected: Invalid token. Socket: ${socket.id}. Error: ${errorMessage}`);
+      logger.warn(
+        `🔌 Connection rejected: Invalid token. Socket: ${socket.id}. Error: ${errorMessage}`
+      );
       return next(new Error('Authentication error: Invalid token'));
     }
   });
@@ -64,21 +72,31 @@ export const registerMessageHandlers = (io: SocketServer) => {
 
     socket.on(SOCKET_EVENTS.JOIN_WORKSPACE, async (workspaceId: string) => {
       if (!workspaceId) {
-        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required to join' });
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'Workspace ID is required to join',
+        });
       }
 
       if (!userId) {
-        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'Authentication required',
+        });
       }
 
       try {
         const access = await isWorkspaceMember(workspaceId, userId);
 
         if (!access.allowed) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: access.message,
+          });
         }
 
         if (socket.rooms.has(workspaceId)) {
+          logger.warn(
+            `⚠️ User ${userId} attempted duplicate join for workspace ${workspaceId}`
+          );
+
           return socket.emit(SOCKET_EVENTS.ERROR, {
             message: 'Already connected to this workspace',
           });
@@ -87,9 +105,12 @@ export const registerMessageHandlers = (io: SocketServer) => {
         socket.join(workspaceId);
 
         logger.info(`🚪 User ${userId} joined room: ${workspaceId}`);
+
         socket.to(workspaceId).emit(SOCKET_EVENTS.USER_JOINED, { userId });
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to join workspace';
+        const errorMessage =
+          error instanceof Error ? error.message : 'Failed to join workspace';
+
         logger.error(`❌ Socket join-workspace error: ${errorMessage}`);
         socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
       }
@@ -97,10 +118,16 @@ export const registerMessageHandlers = (io: SocketServer) => {
 
     socket.on(SOCKET_EVENTS.LEAVE_WORKSPACE, (workspaceId: string) => {
       if (!workspaceId) {
-        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required to leave' });
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'Workspace ID is required to leave',
+        });
       }
 
       if (!socket.rooms.has(workspaceId)) {
+        logger.warn(
+          `⚠️ User ${userId} attempted to leave workspace ${workspaceId} without joining`
+        );
+
         return socket.emit(SOCKET_EVENTS.ERROR, {
           message: 'You are not connected to this workspace',
         });
@@ -109,99 +136,143 @@ export const registerMessageHandlers = (io: SocketServer) => {
       socket.leave(workspaceId);
 
       logger.info(`🚪 User ${userId} left room: ${workspaceId}`);
+
       socket.to(workspaceId).emit(SOCKET_EVENTS.USER_LEFT, { userId });
     });
 
-    socket.on(SOCKET_EVENTS.SEND_MESSAGE, async (data: { workspaceId: string; content: string }) => {
-      try {
-        const { workspaceId, content } = data;
-        const senderId = socket.data.user?.userId;
+    socket.on(
+      SOCKET_EVENTS.SEND_MESSAGE,
+      async (data: { workspaceId: string; content: string }) => {
+        try {
+          const { workspaceId, content } = data;
+          const senderId = socket.data.user?.userId;
 
-        if (!senderId) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
+          if (!senderId) {
+            return socket.emit(SOCKET_EVENTS.ERROR, {
+              message: 'Authentication required',
+            });
+          }
+
+          if (!workspaceId || !content) {
+            return socket.emit(SOCKET_EVENTS.ERROR, {
+              message: 'Workspace ID and content are required',
+            });
+          }
+
+          if (content.trim().length === 0) {
+            return socket.emit(SOCKET_EVENTS.ERROR, {
+              message: 'Message content cannot be empty',
+            });
+          }
+
+          if (content.trim().length > 1000) {
+            return socket.emit(SOCKET_EVENTS.ERROR, {
+              message: 'Message content cannot exceed 1000 characters',
+            });
+          }
+
+          const access = await isWorkspaceMember(workspaceId, senderId);
+
+          if (!access.allowed) {
+            return socket.emit(SOCKET_EVENTS.ERROR, {
+              message: access.message,
+            });
+          }
+
+          if (!socket.rooms.has(workspaceId)) {
+            return socket.emit(SOCKET_EVENTS.ERROR, {
+              message: 'Join the workspace before sending messages',
+            });
+          }
+
+          const savedMessage = await createMessage(
+            workspaceId,
+            senderId,
+            content.trim()
+          );
+
+          io.to(workspaceId).emit(SOCKET_EVENTS.BROADCAST_MESSAGE, savedMessage);
+
+          logger.debug(
+            `📤 Broadcasted message in workspace ${workspaceId} from user ${senderId}`
+          );
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : 'Failed to process message';
+
+          logger.error(`❌ Socket send-message error: ${errorMessage}`);
+          socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
         }
+      }
+    );
 
-        if (!workspaceId || !content) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID and content are required' });
-        }
+    socket.on(
+      SOCKET_EVENTS.BROADCAST_MESSAGE,
+      async (data: { workspaceId: string; message: unknown }) => {
+        const { workspaceId, message } = data;
 
-        if (content.trim().length === 0) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Message content cannot be empty' });
-        }
-
-        if (content.trim().length > 1000) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Message content cannot exceed 1000 characters' });
-        }
-
-        const access = await isWorkspaceMember(workspaceId, senderId);
-
-        if (!access.allowed) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
-        }
-
-        if (!socket.rooms.has(workspaceId)) {
+        if (!userId) {
           return socket.emit(SOCKET_EVENTS.ERROR, {
-            message: 'Join the workspace before sending messages',
+            message: 'Authentication required',
           });
         }
 
-        const savedMessage = await createMessage(workspaceId, senderId, content.trim());
-
-        io.to(workspaceId).emit(SOCKET_EVENTS.BROADCAST_MESSAGE, savedMessage);
-        logger.debug(`📤 Broadcasted message in workspace ${workspaceId} from user ${senderId}`);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to process message';
-        logger.error(`❌ Socket send-message error: ${errorMessage}`);
-        socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
-      }
-    });
-
-    socket.on(SOCKET_EVENTS.BROADCAST_MESSAGE, async (data: { workspaceId: string; message: unknown }) => {
-      const { workspaceId, message } = data;
-
-      if (!userId) {
-        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
-      }
-
-      if (!workspaceId || !message) {
-        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID and message are required' });
-      }
-
-      try {
-        const access = await isWorkspaceMember(workspaceId, userId);
-
-        if (!access.allowed) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
-        }
-
-        if (!socket.rooms.has(workspaceId)) {
+        if (!workspaceId || !message) {
           return socket.emit(SOCKET_EVENTS.ERROR, {
-            message: 'Join the workspace before broadcasting messages',
+            message: 'Workspace ID and message are required',
           });
         }
 
-        socket.to(workspaceId).emit(SOCKET_EVENTS.BROADCAST_MESSAGE, message);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to broadcast message';
-        logger.error(`❌ Socket broadcast-message error: ${errorMessage}`);
-        socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
+        try {
+          const access = await isWorkspaceMember(workspaceId, userId);
+
+          if (!access.allowed) {
+            return socket.emit(SOCKET_EVENTS.ERROR, {
+              message: access.message,
+            });
+          }
+
+          if (!socket.rooms.has(workspaceId)) {
+            return socket.emit(SOCKET_EVENTS.ERROR, {
+              message: 'Join the workspace before broadcasting messages',
+            });
+          }
+
+          socket
+            .to(workspaceId)
+            .emit(SOCKET_EVENTS.BROADCAST_MESSAGE, message);
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+              : 'Failed to broadcast message';
+
+          logger.error(`❌ Socket broadcast-message error: ${errorMessage}`);
+          socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
+        }
       }
-    });
+    );
 
     socket.on(SOCKET_EVENTS.TYPING_START, async (workspaceId: string) => {
       if (!workspaceId) {
-        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required for typing start' });
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'Workspace ID is required for typing start',
+        });
       }
 
       if (!userId) {
-        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'Authentication required',
+        });
       }
 
       try {
         const access = await isWorkspaceMember(workspaceId, userId);
 
         if (!access.allowed) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: access.message,
+          });
         }
 
         if (!socket.rooms.has(workspaceId)) {
@@ -210,9 +281,15 @@ export const registerMessageHandlers = (io: SocketServer) => {
           });
         }
 
-        socket.to(workspaceId).emit(SOCKET_EVENTS.TYPING_START, { userId, workspaceId });
+        socket
+          .to(workspaceId)
+          .emit(SOCKET_EVENTS.TYPING_START, { userId, workspaceId });
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to handle typing start';
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : 'Failed to handle typing start';
+
         logger.error(`❌ Socket typing-start error: ${errorMessage}`);
         socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
       }
@@ -220,18 +297,24 @@ export const registerMessageHandlers = (io: SocketServer) => {
 
     socket.on(SOCKET_EVENTS.TYPING_STOP, async (workspaceId: string) => {
       if (!workspaceId) {
-        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Workspace ID is required for typing stop' });
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'Workspace ID is required for typing stop',
+        });
       }
 
       if (!userId) {
-        return socket.emit(SOCKET_EVENTS.ERROR, { message: 'Authentication required' });
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'Authentication required',
+        });
       }
 
       try {
         const access = await isWorkspaceMember(workspaceId, userId);
 
         if (!access.allowed) {
-          return socket.emit(SOCKET_EVENTS.ERROR, { message: access.message });
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: access.message,
+          });
         }
 
         if (!socket.rooms.has(workspaceId)) {
@@ -240,16 +323,24 @@ export const registerMessageHandlers = (io: SocketServer) => {
           });
         }
 
-        socket.to(workspaceId).emit(SOCKET_EVENTS.TYPING_STOP, { userId, workspaceId });
+        socket
+          .to(workspaceId)
+          .emit(SOCKET_EVENTS.TYPING_STOP, { userId, workspaceId });
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to handle typing stop';
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : 'Failed to handle typing stop';
+
         logger.error(`❌ Socket typing-stop error: ${errorMessage}`);
         socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
       }
     });
 
     socket.on(SOCKET_EVENTS.DISCONNECT, (reason) => {
-      logger.info(`🔌 Chat Socket disconnected: ${socket.id} (User: ${userId}). Reason: ${reason}`);
+      logger.info(
+        `🔌 Chat Socket disconnected: ${socket.id} (User: ${userId}). Reason: ${reason}`
+      );
     });
   });
 };
