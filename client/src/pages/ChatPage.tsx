@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { socket } from "../socket/socket";
 
 interface Message {
@@ -12,8 +12,9 @@ interface Message {
   createdAt?: string;
 }
 
-export default function ChatPage() {
+ export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
   if (!id) {
     return (
@@ -139,28 +140,41 @@ export default function ChatPage() {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
       <div className="w-full max-w-5xl h-[85vh] bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 flex flex-col">
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-          <div>
-            <h1 className="text-2xl font-bold text-white">
-              💬 Workspace Chat
-            </h1>
+       {/* Header */}
+<div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
 
-            <p className="text-slate-400 text-sm">
-              Workspace ID: {workspaceId}
-            </p>
-          </div>
+  <div className="flex items-center gap-4">
 
-          <div
-            className={`px-4 py-2 rounded-full text-sm font-semibold ${
-              connected
-                ? "bg-green-600 text-white"
-                : "bg-red-600 text-white"
-            }`}
-          >
-            {connected ? "🟢 Connected" : "🔴 Disconnected"}
-          </div>
-        </div>
+    <button
+      onClick={() => navigate(`/workspaces/${workspaceId}`)}
+      className="h-10 w-10 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 transition"
+    >
+      ←
+    </button>
+
+    <div>
+      <h1 className="text-2xl font-bold text-white">
+        💬 Workspace Chat
+      </h1>
+
+      <p className="text-slate-400 text-sm">
+        Workspace ID: {workspaceId}
+      </p>
+    </div>
+
+  </div>
+
+  <div
+    className={`px-4 py-2 rounded-full text-sm font-semibold ${
+      connected
+        ? "bg-green-600 text-white"
+        : "bg-red-600 text-white"
+    }`}
+  >
+    {connected ? "🟢 Connected" : "🔴 Disconnected"}
+  </div>
+
+</div>
 
         {/* Messages */}
 <div className="flex-1 overflow-y-auto p-6 bg-slate-950 space-y-4">
