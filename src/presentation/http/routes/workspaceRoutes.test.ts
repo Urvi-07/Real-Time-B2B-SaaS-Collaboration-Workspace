@@ -120,4 +120,44 @@ describe('Workspace Routes Integration', () => {
       expect(res.body.errors[0].message).toBe('Workspace name must be at least 3 characters');
     });
   });
+
+  describe('POST /api/workspaces/:workspaceId/members - Validation', () => {
+    it('should reject member addition if workspaceId is not a valid ObjectId', async () => {
+      const res = await request(app)
+        .post('/api/workspaces/invalid-object-id/members')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ userId: 'user123' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.errors[0].field).toBe('params.workspaceId');
+      expect(res.body.errors[0].message).toBe('Invalid workspace ID format');
+    });
+
+    it('should reject member addition if userId is missing', async () => {
+      const validObjectId = '507f1f77bcf86cd799439011';
+      const res = await request(app)
+        .post(`/api/workspaces/${validObjectId}/members`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.errors[0].field).toBe('body.userId');
+      expect(res.body.errors[0].message).toBe('User ID is required');
+    });
+
+    it('should reject member addition if userId is empty', async () => {
+      const validObjectId = '507f1f77bcf86cd799439011';
+      const res = await request(app)
+        .post(`/api/workspaces/${validObjectId}/members`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ userId: '' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.errors[0].field).toBe('body.userId');
+      expect(res.body.errors[0].message).toBe('User ID cannot be empty');
+    });
+  });
 });
