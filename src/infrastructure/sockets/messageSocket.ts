@@ -11,6 +11,8 @@ interface DecodedToken {
   email: string;
 }
 
+const userWorkspaceMap = new Map<string, Set<string>>();
+
 const isWorkspaceMember = async (workspaceId: string, userId: string) => {
   if (!Types.ObjectId.isValid(workspaceId)) {
     return { allowed: false, message: 'Invalid workspace ID' };
@@ -58,9 +60,11 @@ export const registerMessageHandlers = (io: SocketServer) => {
       next();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+
       logger.warn(
         `🔌 Connection rejected: Invalid token. Socket: ${socket.id}. Error: ${errorMessage}`
       );
+
       return next(new Error('Authentication error: Invalid token'));
     }
   });
@@ -69,6 +73,23 @@ export const registerMessageHandlers = (io: SocketServer) => {
     const userId = socket.data.user?.userId;
 
     logger.info(`🔌 Chat Socket connected: ${socket.id} (User: ${userId})`);
+
+    const previousWorkspaces = userWorkspaceMap.get(userId);
+
+    if (previousWorkspaces && previousWorkspaces.size > 0) {
+      previousWorkspaces.forEach((workspaceId) => {
+        socket.join(workspaceId);
+      });
+
+      socket.emit('reconnected-workspaces', {
+        workspaces: Array.from(previousWorkspaces),
+        message: 'Successfully rejoined previous workspaces',
+      });
+
+      logger.info(
+        `🔁 User ${userId} automatically rejoined ${previousWorkspaces.size} workspace(s)`
+      );
+    }
 
     socket.on(SOCKET_EVENTS.JOIN_WORKSPACE, async (workspaceId: string) => {
       if (!workspaceId) {
@@ -104,6 +125,12 @@ export const registerMessageHandlers = (io: SocketServer) => {
 
         socket.join(workspaceId);
 
+        if (!userWorkspaceMap.has(userId)) {
+          userWorkspaceMap.set(userId, new Set<string>());
+        }
+
+        userWorkspaceMap.get(userId)?.add(workspaceId);
+
         logger.info(`🚪 User ${userId} joined room: ${workspaceId}`);
 
         socket.to(workspaceId).emit(SOCKET_EVENTS.USER_JOINED, { userId });
@@ -134,6 +161,12 @@ export const registerMessageHandlers = (io: SocketServer) => {
       }
 
       socket.leave(workspaceId);
+
+      userWorkspaceMap.get(userId)?.delete(workspaceId);
+
+      if (userWorkspaceMap.get(userId)?.size === 0) {
+        userWorkspaceMap.delete(userId);
+      }
 
       logger.info(`🚪 User ${userId} left room: ${workspaceId}`);
 
