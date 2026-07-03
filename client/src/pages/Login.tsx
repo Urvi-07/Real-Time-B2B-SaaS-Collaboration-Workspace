@@ -26,37 +26,54 @@ export default function Login() {
       console.log("LOGIN RESPONSE:", res.data);
 
       // Get token from backend response
-      const token =
-        res.data?.token ||
-        res.data?.data?.token ||
-        res.data?.accessToken;
+const token =
+  res.data?.token ||
+  res.data?.data?.token ||
+  res.data?.accessToken;
 
-      if (!token) {
-        setError("Login failed: Token not received from backend.");
-        return;
-      }
+// Get user object (supports common response formats)
+const user =
+  res.data?.user ||
+  res.data?.data?.user ||
+  res.data?.data;
 
-      // Save token
-      localStorage.setItem("token", token);
+if (!token) {
+  setError("Login failed: Token not received from backend.");
+  return;
+}
 
-      console.log("✅ Token saved");
+// Save token
+localStorage.setItem("token", token);
 
-      // Update socket authentication
-      socket.auth = {
-        token,
-      };
+// Save user details if available
+if (user) {
+  if (user.name) {
+    localStorage.setItem("name", user.name);
+  }
 
-      // Reconnect socket with latest auth
-      if (socket.connected) {
-        socket.disconnect();
-      }
+  if (user.email) {
+    localStorage.setItem("email", user.email);
+  }
+}
 
-      socket.connect();
+console.log("✅ Token and user details saved");
 
-      console.log("🔌 Connecting to Socket.IO server...");
+// Update socket authentication
+socket.auth = {
+  token,
+};
 
-      // Navigate after login
-      navigate("/dashboard");
+// Reconnect socket with latest auth
+if (socket.connected) {
+  socket.disconnect();
+}
+
+socket.connect();
+
+console.log("🔌 Connecting to Socket.IO server...");
+
+// Navigate after login
+navigate("/dashboard");
 
     } catch (err: any) {
       console.error(err);
