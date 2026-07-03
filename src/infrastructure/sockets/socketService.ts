@@ -37,7 +37,7 @@ export class SocketService {
   private static pubClient: Redis | null = null;
   private static subClient: Redis | null = null;
 
-  public static init(httpServer: HttpServer): SocketServer {
+  public static init(httpServer: HttpServer, useRedis = true): SocketServer {
     if (this.io) return this.io;
 
     this.io = new SocketServer(httpServer, {
@@ -50,20 +50,24 @@ export class SocketService {
       pingInterval: 25000,
     });
 
-    try {
-      logger.info('⏳ Initializing Redis Socket.IO Adapter...');
-      this.pubClient = connectRedis();
-      this.subClient = this.pubClient.duplicate();
+    if (useRedis) {
+      try {
+        logger.info('⏳ Initializing Redis Socket.IO Adapter...');
+        this.pubClient = connectRedis();
+        this.subClient = this.pubClient.duplicate();
 
-      this.subClient.on('error', (err) => {
-        logger.error(`❌ Redis Socket.IO adapter subClient error: ${err.message}`);
-      });
+        this.subClient.on('error', (err) => {
+          logger.error(`❌ Redis Socket.IO adapter subClient error: ${err.message}`);
+        });
 
-      this.io.adapter(createAdapter(this.pubClient, this.subClient));
-      logger.info('🚀 Socket.io Redis Adapter initialized successfully');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`💥 Failed to initialize Redis Socket.IO Adapter: ${errorMessage}`);
+        this.io.adapter(createAdapter(this.pubClient, this.subClient));
+        logger.info('🚀 Socket.io Redis Adapter initialized successfully');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error(`💥 Failed to initialize Redis Socket.IO Adapter: ${errorMessage}`);
+      }
+    } else {
+      logger.warn('⚠️ Socket.io is running with default in-memory adapter (No Redis replication)');
     }
 
     this.io.use((socket: Socket, next) => {

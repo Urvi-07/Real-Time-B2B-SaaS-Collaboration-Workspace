@@ -4,7 +4,7 @@ import { config } from './infrastructure/config/config';
 import { logger } from './infrastructure/logging/logger';
 import { SocketService } from './infrastructure/sockets/socketService';
 import { connectDatabase, disconnectDatabase } from './infrastructure/database/mongoose';
-import { disconnectRedis, getRedisClient, waitForRedis } from './infrastructure/redis/redisClient';
+import { connectRedis, disconnectRedis, waitForRedis } from './infrastructure/redis/redisClient';
 
 const server = http.createServer(app);
 
@@ -34,24 +34,36 @@ const shutdownGracefully = (signal: string) => {
 };
 
 const startServer = async () => {
+  const isProduction = config.NODE_ENV === 'production';
+  let useRedis = true;
+
   try {
     // Establish database connection first (fails startup on error)
     await connectDatabase();
 
-    // Initialize Socket.io server
-    SocketService.init(server);
+    // Start Redis client connection
+    const pubClient = connectRedis();
 
-    // Verify Redis connection is ready (fails startup on error)
+    // Verify Redis connection is ready
     try {
-      const pubClient = getRedisClient();
       logger.info('⏳ Verifying Redis connection readiness...');
       await waitForRedis(pubClient, 5000);
       logger.info('🎉 Redis connection verified.');
     } catch (redisError) {
       const errMsg = redisError instanceof Error ? redisError.message : String(redisError);
-      logger.error(`❌ Redis connection verification failed: ${errMsg}`);
-      throw new Error(`Critical startup failure: Redis is not reachable. ${errMsg}`, { cause: redisError });
+      if (isProduction) {
+        logger.error(`❌ Redis connection verification failed: ${errMsg}`);
+        throw new Error(`Critical startup failure: Redis is not reachable. ${errMsg}`, { cause: redisError });
+      } else {
+        logger.warn(`⚠️ Redis is unreachable. Falling back to local in-memory adapter. Error: ${errMsg}`);
+        useRedis = false;
+        // Gracefully disconnect client to stop background reconnect warnings in console
+        await disconnectRedis();
+      }
     }
+
+    // Initialize Socket.io server
+    SocketService.init(server, useRedis);
 
     // Start listening
     server.listen(config.PORT, () => {
