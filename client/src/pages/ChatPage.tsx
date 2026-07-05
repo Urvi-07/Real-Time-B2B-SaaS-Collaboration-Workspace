@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { socket } from "../socket/socket";
+import { socket,connectSocket } from "../socket/socket";
 
 interface Message {
   _id?: string;
@@ -35,9 +35,9 @@ interface Message {
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!socket.connected) {
-      socket.connect();
-    }
+    
+  connectSocket();
+    
 
     socket.emit("join-workspace", { workspaceId });
 
@@ -52,24 +52,27 @@ interface Message {
     };
 
     const onMessage = (msg: Message) => {
-      console.log("Received:", msg);
+  console.log("Received Message:", msg);
 
-      setMessages((prev) => {
-        const exists = prev.some(
-          (m) =>
-            m.content === msg.content &&
-            m.sender?.name === msg.sender?.name &&
-            m.createdAt === msg.createdAt
-        );
+  setMessages((prev) => {
+    const exists = prev.some(
+      (m) =>
+        m.content === msg.content &&
+        m.sender?.name === msg.sender?.name &&
+        m.createdAt === msg.createdAt
+    );
 
-        return exists ? prev : [...prev, msg];
-      });
-    };
+    return exists ? prev : [...prev, msg];
+  });
+};
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
 
-    socket.on("broadcast-message", onMessage);
+    socket.on("broadcast-message", (msg: Message) => {
+  console.log("🔥 Broadcast Received:", msg);
+  onMessage(msg);
+});
 
     socket.on("typing-start", () => setTyping(true));
     socket.on("typing-stop", () => setTyping(false));
@@ -123,6 +126,10 @@ interface Message {
 
     // Show immediately
     setMessages((prev) => [...prev, myMessage]);
+    console.log("📤 Sending:", {
+  workspaceId,
+  content: message,
+});
 
     socket.emit("send-message", {
       workspaceId,
@@ -190,7 +197,6 @@ interface Message {
   ) : (
     messages.map((msg, index) => {
       const isMe = msg.sender?.name === "You";
-
       return (
         <div
           key={msg._id || index}

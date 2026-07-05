@@ -19,7 +19,7 @@ export default function Home() {
             <div>
 
               <h1 className="text-xl font-bold">
-                CollabSpace
+                Orbit
               </h1>
 
               <p className="text-xs text-slate-400">
@@ -75,7 +75,7 @@ export default function Home() {
 
           <p className="text-slate-400 text-lg mt-6 leading-8">
 
-            CollabSpace helps teams manage workspaces,
+            Orbit helps teams manage workspaces,
             communicate instantly using real-time chat,
             and collaborate securely from anywhere.
 
@@ -316,7 +316,7 @@ export default function Home() {
           </h2>
 
           <p className="mt-5 text-blue-100 text-lg">
-            Join CollabSpace today and collaborate with your team in real time.
+            Join Orbit today and collaborate with your team in real time.
           </p>
 
           <Link
@@ -343,7 +343,7 @@ export default function Home() {
       <div>
 
         <h3 className="text-2xl font-bold">
-          🚀 CollabSpace
+          🚀 Orbit
         </h3>
 
         <p className="text-slate-400 mt-3">
@@ -420,11 +420,11 @@ export default function Home() {
         </h3>
 
         <p className="text-slate-400">
-          📧 support@collabspace.com
+          📧 support@orbit.com
         </p>
 
         <p className="text-slate-400 mt-2">
-          🌐 www.collabspace.com
+          🌐 www.orbit.com
         </p>
 
       </div>
@@ -434,7 +434,7 @@ export default function Home() {
     <div className="border-t border-slate-800 mt-8 pt-6 text-center">
 
       <p className="text-slate-500 text-sm">
-        © 2026 <span className="font-semibold text-white">CollabSpace</span>. All Rights Reserved.
+        © 2026 <span className="font-semibold text-white">Orbit</span>. All Rights Reserved.
       </p>
 
     </div>
