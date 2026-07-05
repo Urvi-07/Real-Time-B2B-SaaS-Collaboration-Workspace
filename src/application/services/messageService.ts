@@ -41,7 +41,7 @@ export const createMessage = async (
   if (!workspaceId || !Types.ObjectId.isValid(workspaceId)) {
     throw new BadRequestError('Invalid workspace ID');
   }
-  if (!senderId || !Types.ObjectId.isValid(senderId)) {
+  if (!senderId || senderId.trim().length === 0) {
     throw new BadRequestError('Invalid sender ID');
   }
   if (!content || content.trim().length === 0) {
@@ -50,7 +50,7 @@ export const createMessage = async (
 
   const doc = await MessageModel.create({
     workspaceId: new Types.ObjectId(workspaceId),
-    senderId: new Types.ObjectId(senderId),
+    senderId,
     content: content.trim(),
   });
 

@@ -19,7 +19,7 @@ describe('Message Service', () => {
       const mockDoc = {
         _id: new Types.ObjectId(),
         workspaceId: new Types.ObjectId(validWorkspaceId),
-        senderId: new Types.ObjectId(validSenderId),
+        senderId: validSenderId,
         content: validContent,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -31,7 +31,7 @@ describe('Message Service', () => {
 
       expect(MessageModel.create).toHaveBeenCalledWith({
         workspaceId: new Types.ObjectId(validWorkspaceId),
-        senderId: new Types.ObjectId(validSenderId),
+        senderId: validSenderId,
         content: validContent,
       });
       expect(result.content).toBe(validContent);
@@ -40,13 +40,36 @@ describe('Message Service', () => {
       expect(result.id).toBe(mockDoc._id.toString());
     });
 
+    it('should successfully store a message with a string sender ID like "1783225905344"', async () => {
+      const stringSenderId = '1783225905344';
+      const mockDoc = {
+        _id: new Types.ObjectId(),
+        workspaceId: new Types.ObjectId(validWorkspaceId),
+        senderId: stringSenderId,
+        content: validContent,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (MessageModel.create as jest.Mock).mockResolvedValue(mockDoc);
+
+      const result = await createMessage(validWorkspaceId, stringSenderId, validContent);
+
+      expect(MessageModel.create).toHaveBeenCalledWith({
+        workspaceId: new Types.ObjectId(validWorkspaceId),
+        senderId: stringSenderId,
+        content: validContent,
+      });
+      expect(result.senderId).toBe(stringSenderId);
+    });
+
     it('should throw BadRequestError if workspaceId is invalid', async () => {
       await expect(createMessage('invalid-id', validSenderId, validContent))
         .rejects.toThrow(BadRequestError);
     });
 
-    it('should throw BadRequestError if senderId is invalid', async () => {
-      await expect(createMessage(validWorkspaceId, 'invalid-id', validContent))
+    it('should throw BadRequestError if senderId is empty', async () => {
+      await expect(createMessage(validWorkspaceId, '', validContent))
         .rejects.toThrow(BadRequestError);
     });
 
