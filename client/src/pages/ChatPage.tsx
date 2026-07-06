@@ -38,8 +38,7 @@ interface Message {
     
   connectSocket();
     
-
-    socket.emit("join-workspace", { workspaceId });
+    socket.emit("join-workspace", workspaceId);
 
     console.log("Joined Workspace:", workspaceId);
 
@@ -63,7 +62,7 @@ interface Message {
     );
 
     return exists ? prev : [...prev, msg];
-  });
+  }); 
 };
 
     socket.on("connect", onConnect);
@@ -97,19 +96,15 @@ interface Message {
   ) => {
     setMessage(e.target.value);
 
-    socket.emit("typing-start", {
-      workspaceId,
-    });
+    socket.emit("typing-start", workspaceId);
 
     if (typingTimeout.current) {
       clearTimeout(typingTimeout.current);
     }
 
     typingTimeout.current = setTimeout(() => {
-      socket.emit("typing-stop", {
-        workspaceId,
-      });
-    }, 1000);
+  socket.emit("typing-stop", workspaceId);
+}, 1000);
   };
 
   const handleSend = () => {
@@ -136,9 +131,7 @@ interface Message {
       content: message,
     });
 
-    socket.emit("typing-stop", {
-      workspaceId,
-    });
+    socket.emit("typing-stop", workspaceId);
 
     setMessage("");
   };
