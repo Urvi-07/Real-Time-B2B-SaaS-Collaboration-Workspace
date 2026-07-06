@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { WorkspaceModel } from '../../../infrastructure/database/models/Workspace';
 import { sendSuccess } from '../utils/apiResponse';
-import { NotFoundError, ForbiddenError, UnauthorizedError, BadRequestError } from '../../../infrastructure/errors/AppError';
+import { NotFoundError, ForbiddenError, UnauthorizedError, BadRequestError, ConflictError } from '../../../infrastructure/errors/AppError';
+import { users } from './authController';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -172,6 +173,56 @@ export const deleteWorkspace = async (
     await WorkspaceModel.findByIdAndDelete(id);
 
     return sendSuccess(res, 'Workspace deleted successfully', { id });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * Add a member to a workspace.
+ * Only the owner is permitted to add members.
+ */
+export const addWorkspaceMember = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { workspaceId } = req.params;
+    const { userId } = req.body;
+    const currentUserId = req.user?.userId;
+
+    if (!currentUserId) {
+      throw new UnauthorizedError('User is not authenticated');
+    }
+
+    const workspace = await WorkspaceModel.findById(workspaceId);
+    if (!workspace) {
+      throw new NotFoundError('Workspace not found');
+    }
+
+    if (workspace.ownerId !== currentUserId) {
+      throw new ForbiddenError('Only the workspace owner can add members');
+    }
+
+    // Verify target user exists
+    const userExists = users.find((user) => user.id === userId);
+    if (!userExists) {
+      throw new NotFoundError('User not found');
+    }
+
+    // Prevent duplicate members
+    if (workspace.members.includes(userId)) {
+      throw new ConflictError('User is already a member');
+    }
+
+    workspace.members.push(userId);
+    await workspace.save();
+
+    return sendSuccess(res, 'Member added successfully', {
+      workspaceId: workspace._id.toString(),
+      memberId: userId,
+    });
   } catch (error) {
     return next(error);
   }

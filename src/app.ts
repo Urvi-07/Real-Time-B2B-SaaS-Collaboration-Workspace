@@ -34,20 +34,7 @@ const morganMiddleware = morgan(':method :url :status :res[content-length] - :re
 });
 app.use(morganMiddleware);
 
-// 4. Global Rate Limiter
-const limiter = rateLimit({
-  windowMs: config.RATE_LIMIT_WINDOW_MS,
-  max: config.RATE_LIMIT_MAX,
-  message: {
-    status: 'error',
-    message: 'Too many requests from this IP, please try again later.',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use(limiter);
-
-// 5. Health Check Router
+// 5. Health Check Routes (Exempt from rate limiting to prevent load balancer 429 blockages)
 app.get('/health', (_req: Request, res: Response) => {
   sendSuccess(res, 'System health statistics retrieved successfully', {
     timestamp: new Date().toISOString(),
@@ -63,6 +50,19 @@ app.get('/', (_req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// 4. Global Rate Limiter (applied to API endpoints only)
+const limiter = rateLimit({
+  windowMs: config.RATE_LIMIT_WINDOW_MS,
+  max: config.RATE_LIMIT_MAX,
+  message: {
+    status: 'error',
+    message: 'Too many requests from this IP, please try again later.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
 // Authentication Routes
 app.use('/api/auth', authRoutes);
 // Workspace Routes

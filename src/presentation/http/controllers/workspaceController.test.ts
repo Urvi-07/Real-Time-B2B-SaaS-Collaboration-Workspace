@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createWorkspace, getWorkspaces, getWorkspaceById, updateWorkspace, deleteWorkspace } from './workspaceController';
+import { createWorkspace, getWorkspaces, getWorkspaceById, updateWorkspace, deleteWorkspace, addWorkspaceMember } from './workspaceController';
 import { WorkspaceModel } from '../../../infrastructure/database/models/Workspace';
-import { NotFoundError, ForbiddenError, UnauthorizedError, BadRequestError } from '../../../infrastructure/errors/AppError';
+import { NotFoundError, ForbiddenError, UnauthorizedError, BadRequestError, ConflictError } from '../../../infrastructure/errors/AppError';
+import { users } from './authController';
 
 jest.mock('../../../infrastructure/database/models/Workspace');
 
@@ -221,6 +222,138 @@ describe('Workspace Controller', () => {
 
       expect(nextFunction).toHaveBeenCalledWith(expect.any(ForbiddenError));
       expect(WorkspaceModel.findByIdAndDelete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addWorkspaceMember', () => {
+    const targetUserId = 'targetUser123';
+
+    beforeEach(() => {
+      // Clear users list and seed target user
+      users.length = 0;
+      users.push({
+        id: targetUserId,
+        name: 'Target User',
+        email: 'target@test.com',
+        password: 'hashedpassword',
+      });
+    });
+
+    afterEach(() => {
+      users.length = 0;
+    });
+
+    it('should successfully add a member and return 200', async () => {
+      mockRequest.params = { workspaceId: 'ws1' };
+      mockRequest.body = { userId: targetUserId };
+      mockRequest.user = { userId: 'owner1' };
+
+      const mockWorkspaceSave = jest.fn().mockResolvedValue({
+        _id: 'ws1',
+        name: 'WS 1',
+        ownerId: 'owner1',
+        members: ['owner1', targetUserId],
+      });
+
+      const mockWorkspace = {
+        _id: 'ws1',
+        name: 'WS 1',
+        ownerId: 'owner1',
+        members: ['owner1'],
+        save: mockWorkspaceSave,
+      };
+
+      (WorkspaceModel.findById as jest.Mock).mockResolvedValue(mockWorkspace);
+
+      await addWorkspaceMember(mockRequest, mockResponse, nextFunction);
+
+      expect(WorkspaceModel.findById).toHaveBeenCalledWith('ws1');
+      expect(mockWorkspace.members).toContain(targetUserId);
+      expect(mockWorkspaceSave).toHaveBeenCalled();
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Member added successfully',
+        data: {
+          workspaceId: 'ws1',
+          memberId: targetUserId,
+        },
+      });
+    });
+
+    it('should call next with UnauthorizedError if auth is missing', async () => {
+      mockRequest.params = { workspaceId: 'ws1' };
+      mockRequest.body = { userId: targetUserId };
+
+      await addWorkspaceMember(mockRequest, mockResponse, nextFunction);
+
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(UnauthorizedError));
+    });
+
+    it('should call next with NotFoundError if workspace is not found', async () => {
+      mockRequest.params = { workspaceId: 'ws_invalid' };
+      mockRequest.body = { userId: targetUserId };
+      mockRequest.user = { userId: 'owner1' };
+
+      (WorkspaceModel.findById as jest.Mock).mockResolvedValue(null);
+
+      await addWorkspaceMember(mockRequest, mockResponse, nextFunction);
+
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(NotFoundError));
+    });
+
+    it('should call next with ForbiddenError if non-owner attempts to add member', async () => {
+      mockRequest.params = { workspaceId: 'ws1' };
+      mockRequest.body = { userId: targetUserId };
+      mockRequest.user = { userId: 'non-owner' };
+
+      const mockWorkspace = {
+        _id: 'ws1',
+        ownerId: 'owner1',
+        members: ['owner1'],
+      };
+
+      (WorkspaceModel.findById as jest.Mock).mockResolvedValue(mockWorkspace);
+
+      await addWorkspaceMember(mockRequest, mockResponse, nextFunction);
+
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(ForbiddenError));
+    });
+
+    it('should call next with NotFoundError if user does not exist', async () => {
+      mockRequest.params = { workspaceId: 'ws1' };
+      mockRequest.body = { userId: 'non-existent-user' };
+      mockRequest.user = { userId: 'owner1' };
+
+      const mockWorkspace = {
+        _id: 'ws1',
+        ownerId: 'owner1',
+        members: ['owner1'],
+      };
+
+      (WorkspaceModel.findById as jest.Mock).mockResolvedValue(mockWorkspace);
+
+      await addWorkspaceMember(mockRequest, mockResponse, nextFunction);
+
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(NotFoundError));
+    });
+
+    it('should call next with ConflictError if user is already a member', async () => {
+      mockRequest.params = { workspaceId: 'ws1' };
+      mockRequest.body = { userId: targetUserId };
+      mockRequest.user = { userId: 'owner1' };
+
+      const mockWorkspace = {
+        _id: 'ws1',
+        ownerId: 'owner1',
+        members: ['owner1', targetUserId],
+      };
+
+      (WorkspaceModel.findById as jest.Mock).mockResolvedValue(mockWorkspace);
+
+      await addWorkspaceMember(mockRequest, mockResponse, nextFunction);
+
+      expect(nextFunction).toHaveBeenCalledWith(expect.any(ConflictError));
     });
   });
 });

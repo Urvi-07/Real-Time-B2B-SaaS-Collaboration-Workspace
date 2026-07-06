@@ -2,7 +2,7 @@ import { Schema, model, Document, Types } from 'mongoose';
 
 export interface IMessageDocument extends Document {
   workspaceId: Types.ObjectId;
-  senderId: Types.ObjectId;
+  senderId: string;
   content: string;
   createdAt: Date;
   updatedAt: Date;
@@ -16,8 +16,7 @@ const messageSchema = new Schema<IMessageDocument>(
       required: [true, 'Workspace ID is required'],
     },
     senderId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
+      type: String,
       required: [true, 'Sender ID is required'],
     },
     content: {

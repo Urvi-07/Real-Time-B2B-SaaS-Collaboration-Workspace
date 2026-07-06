@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { User } from '../../../domain/entities/User';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { JwtPayload } from 'jsonwebtoken';
-const users: User[] = [];
+export const users: User[] = [];
 
 export const register = async (req: Request, res: Response) => {
   const { name, email, password } = req.body;

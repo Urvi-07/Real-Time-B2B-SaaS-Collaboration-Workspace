@@ -5,10 +5,11 @@ import {
   getWorkspaceById,
   updateWorkspace,
   deleteWorkspace,
+  addWorkspaceMember,
 } from '../controllers/workspaceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { validateRequest } from '../middleware/validateRequest';
-import { createWorkspaceSchema, updateWorkspaceSchema } from '../dtos/workspaceDto';
+import { createWorkspaceSchema, updateWorkspaceSchema, addMemberSchema } from '../dtos/workspaceDto';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.get('/', getWorkspaces);
 router.get('/:id', getWorkspaceById);
 router.put('/:id', validateRequest(updateWorkspaceSchema), updateWorkspace);
 router.delete('/:id', deleteWorkspace);
+router.post('/:workspaceId/members', validateRequest(addMemberSchema), addWorkspaceMember);
 
 export default router;
