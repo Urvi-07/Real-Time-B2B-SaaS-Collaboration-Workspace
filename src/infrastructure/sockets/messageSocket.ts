@@ -232,6 +232,88 @@ export const registerMessageHandlers = (io: SocketServer) => {
       }
     );
 
+    socket.on(SOCKET_EVENTS.TYPING_START, async (workspaceId: string) => {
+      if (!workspaceId) {
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'Workspace ID is required for typing start',
+        });
+      }
+
+      if (!userId) {
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'Authentication required',
+        });
+      }
+
+      try {
+        const access = await isWorkspaceMember(workspaceId, userId);
+
+        if (!access.allowed) {
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: access.message,
+          });
+        }
+
+        if (!socket.rooms.has(workspaceId)) {
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: 'Join the workspace before emitting typing status',
+          });
+        }
+
+        socket.to(workspaceId).emit(SOCKET_EVENTS.TYPING_START, {
+          userId,
+          workspaceId,
+        });
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Failed to handle typing start';
+
+        logger.error(`❌ Typing start error | Socket: ${socket.id} | Error: ${errorMessage}`);
+        socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.TYPING_STOP, async (workspaceId: string) => {
+      if (!workspaceId) {
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'Workspace ID is required for typing stop',
+        });
+      }
+
+      if (!userId) {
+        return socket.emit(SOCKET_EVENTS.ERROR, {
+          message: 'Authentication required',
+        });
+      }
+
+      try {
+        const access = await isWorkspaceMember(workspaceId, userId);
+
+        if (!access.allowed) {
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: access.message,
+          });
+        }
+
+        if (!socket.rooms.has(workspaceId)) {
+          return socket.emit(SOCKET_EVENTS.ERROR, {
+            message: 'Join the workspace before emitting typing status',
+          });
+        }
+
+        socket.to(workspaceId).emit(SOCKET_EVENTS.TYPING_STOP, {
+          userId,
+          workspaceId,
+        });
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Failed to handle typing stop';
+
+        logger.error(`❌ Typing stop error | Socket: ${socket.id} | Error: ${errorMessage}`);
+        socket.emit(SOCKET_EVENTS.ERROR, { message: errorMessage });
+      }
+    });
+
     socket.on(SOCKET_EVENTS.DISCONNECT, (reason) => {
       logger.info(
         `🔌 Chat socket disconnected | User: ${userId} | Socket: ${socket.id} | Reason: ${reason}`

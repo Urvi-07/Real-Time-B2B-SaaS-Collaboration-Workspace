@@ -1,15 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { registerMessageHandlers } from './messageSocket';
+import type { registerMessageHandlers as registerMessageHandlersType } from './messageSocket';
 import { SOCKET_EVENTS } from './socketEvents';
-import { WorkspaceModel } from '../database/models/Workspace';
-import { createMessage } from '../../application/services/messageService';
-import jwt from 'jsonwebtoken';
+import type { WorkspaceModel as WorkspaceModelType } from '../database/models/Workspace';
+import type { createMessage as createMessageType } from '../../application/services/messageService';
+import type jwtType from 'jsonwebtoken';
 
 jest.mock('../database/models/Workspace');
 jest.mock('../../application/services/messageService');
 jest.mock('jsonwebtoken');
 
 describe('Message Socket', () => {
+  let registerMessageHandlers: typeof registerMessageHandlersType;
+  let WorkspaceModel: typeof WorkspaceModelType;
+  let createMessage: typeof createMessageType;
+  let jwt: typeof jwtType;
   let mockIo: any;
   let mockSocket: any;
   let middleware: any;
@@ -17,6 +21,15 @@ describe('Message Socket', () => {
   let eventListeners: Record<string, (...args: any[]) => any>;
 
   beforeEach(() => {
+    jest.resetModules();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    registerMessageHandlers = require('./messageSocket').registerMessageHandlers;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    WorkspaceModel = require('../database/models/Workspace').WorkspaceModel;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    createMessage = require('../../application/services/messageService').createMessage;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    jwt = require('jsonwebtoken');
     eventListeners = {};
     mockIo = {
       use: jest.fn().mockImplementation((fn) => {
@@ -40,8 +53,13 @@ describe('Message Socket', () => {
       data: {
         user: { userId: 'user-123', email: 'user@test.com' },
       },
-      join: jest.fn(),
-      leave: jest.fn(),
+      rooms: new Set<string>(),
+      join: jest.fn().mockImplementation((room) => {
+        mockSocket.rooms.add(room);
+      }),
+      leave: jest.fn().mockImplementation((room) => {
+        mockSocket.rooms.delete(room);
+      }),
       emit: jest.fn(),
       to: jest.fn().mockReturnValue({
         emit: jest.fn(),
@@ -183,6 +201,7 @@ describe('Message Socket', () => {
     describe('send-message', () => {
       it('should allow member to send message and store/broadcast it', async () => {
         const workspaceId = '507f1f77bcf86cd799439011';
+        mockSocket.rooms.add(workspaceId);
         const mockWorkspace = {
           _id: workspaceId,
           ownerId: 'other-user',
@@ -209,6 +228,7 @@ describe('Message Socket', () => {
 
       it('should reject non-member from sending message', async () => {
         const workspaceId = '507f1f77bcf86cd799439011';
+        mockSocket.rooms.add(workspaceId);
         const mockWorkspace = {
           _id: workspaceId,
           ownerId: 'other-user',
@@ -232,6 +252,7 @@ describe('Message Socket', () => {
     describe('typing-start', () => {
       it('should allow member to emit typing-start and broadcast to room', async () => {
         const workspaceId = '507f1f77bcf86cd799439011';
+        mockSocket.rooms.add(workspaceId);
         const mockWorkspace = {
           _id: workspaceId,
           ownerId: 'other-user',
@@ -248,6 +269,7 @@ describe('Message Socket', () => {
 
       it('should reject non-member from emitting typing-start', async () => {
         const workspaceId = '507f1f77bcf86cd799439011';
+        mockSocket.rooms.add(workspaceId);
         const mockWorkspace = {
           _id: workspaceId,
           ownerId: 'other-user',
@@ -268,6 +290,7 @@ describe('Message Socket', () => {
     describe('typing-stop', () => {
       it('should allow member to emit typing-stop and broadcast to room', async () => {
         const workspaceId = '507f1f77bcf86cd799439011';
+        mockSocket.rooms.add(workspaceId);
         const mockWorkspace = {
           _id: workspaceId,
           ownerId: 'other-user',
@@ -284,6 +307,7 @@ describe('Message Socket', () => {
 
       it('should reject non-member from emitting typing-stop', async () => {
         const workspaceId = '507f1f77bcf86cd799439011';
+        mockSocket.rooms.add(workspaceId);
         const mockWorkspace = {
           _id: workspaceId,
           ownerId: 'other-user',
