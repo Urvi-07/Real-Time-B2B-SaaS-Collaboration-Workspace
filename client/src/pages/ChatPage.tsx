@@ -4,12 +4,10 @@ import { socket,connectSocket } from "../socket/socket";
 
 interface Message {
   _id?: string;
-  sender?: {
-    name?: string;
-    email?: string;
-  };
+  id?: string;
+  senderId: string;
   content: string;
-  createdAt?: string;
+  createdAt: string;
 }
 
  export default function ChatPage() {
@@ -33,57 +31,69 @@ interface Message {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Get logged-in user id from JWT
+const token = localStorage.getItem("token");
+
+const currentUserId = token
+  ? JSON.parse(atob(token.split(".")[1])).userId
+  : "";
 
   useEffect(() => {
-    
+
   connectSocket();
-    
+
+  const onConnect = () => {
+    console.log("Connected:", socket.id);
+
+    setConnected(true);
+
     socket.emit("join-workspace", workspaceId);
 
     console.log("Joined Workspace:", workspaceId);
+  };
 
-    const onConnect = () => {
-      setConnected(true);
-    };
+  const onDisconnect = () => {
+    setConnected(false);
+  };
 
-    const onDisconnect = () => {
-      setConnected(false);
-    };
-
-    const onMessage = (msg: Message) => {
-  console.log("Received Message:", msg);
-
+ const onMessage = (msg: Message) => {
   setMessages((prev) => {
+
     const exists = prev.some(
-      (m) =>
-        m.content === msg.content &&
-        m.sender?.name === msg.sender?.name &&
-        m.createdAt === msg.createdAt
+      (m) => m._id && m._id === msg._id
     );
 
-    return exists ? prev : [...prev, msg];
-  }); 
+    if (exists) {
+      return prev;
+    }
+
+    return [...prev, msg];
+  });
 };
 
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
+  socket.on("connect", onConnect);
 
-    socket.on("broadcast-message", (msg: Message) => {
-  console.log("🔥 Broadcast Received:", msg);
-  onMessage(msg);
-});
+if (socket.connected) {
+  socket.emit("join-workspace", workspaceId);
+}
 
-    socket.on("typing-start", () => setTyping(true));
-    socket.on("typing-stop", () => setTyping(false));
+  socket.on("disconnect", onDisconnect);
 
-    return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-      socket.off("broadcast-message", onMessage);
-      socket.off("typing-start");
-      socket.off("typing-stop");
-    };
-  }, [workspaceId]);
+  socket.on("broadcast-message", onMessage);
+
+  socket.on("typing-start", () => setTyping(true));
+
+  socket.on("typing-stop", () => setTyping(false));
+
+  return () => {
+    socket.off("connect", onConnect);
+    socket.off("disconnect", onDisconnect);
+    socket.off("broadcast-message", onMessage);
+    socket.off("typing-start");
+    socket.off("typing-stop");
+  };
+
+}, [workspaceId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
@@ -108,33 +118,21 @@ interface Message {
   };
 
   const handleSend = () => {
-    if (!message.trim()) return;
+  if (!message.trim()) return;
 
-    const myMessage: Message = {
-      _id: Date.now().toString(),
-      sender: {
-        name: "You",
-      },
-      content: message,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Show immediately
-    setMessages((prev) => [...prev, myMessage]);
-    console.log("📤 Sending:", {
-  workspaceId,
-  content: message,
-});
-
-    socket.emit("send-message", {
-      workspaceId,
-      content: message,
-    });
-
-    socket.emit("typing-stop", workspaceId);
-
-    setMessage("");
+  const newMessage = {
+    workspaceId,
+    content: message.trim(),
   };
+
+  console.log("📤 Sending:", newMessage);
+
+  socket.emit("send-message", newMessage);
+
+  socket.emit("typing-stop", workspaceId);
+
+  setMessage("");
+};
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
@@ -189,43 +187,36 @@ interface Message {
     </div>
   ) : (
     messages.map((msg, index) => {
-      const isMe = msg.sender?.name === "You";
-      return (
-        <div
-          key={msg._id || index}
-          className={`flex ${
-            isMe ? "justify-end" : "justify-start"
-          }`}
-        >
-          <div
-            className={`max-w-[75%] px-4 py-3 rounded-2xl shadow-lg transition-all duration-200 ${
-              isMe
-                ? "bg-blue-600 rounded-br-md"
-                : "bg-slate-800 rounded-bl-md"
-            }`}
-          >
-            {!isMe && (
-              <p className="text-xs font-semibold text-blue-400 mb-1">
-                {msg.sender?.name || "User"}
-              </p>
-            )}
+  const isMe = String(msg.senderId) === String(currentUserId);
 
-            <p className="text-white break-words">
-              {msg.content}
-            </p>
+  return (
+    <div
+      key={msg._id || msg.id || index}
+      className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+    >
+      <div
+        className={`max-w-[70%] px-4 py-3 rounded-2xl ${
+          isMe
+            ? "bg-blue-600 text-white rounded-br-sm"
+            : "bg-slate-800 text-white rounded-bl-sm"
+        }`}
+      >
+        <p className="text-xs text-blue-300 mb-1">
+          {isMe ? "You" : "Teammate"}
+        </p>
 
-            <p className="text-[10px] text-right mt-2 opacity-70">
-              {msg.createdAt
-                ? new Date(msg.createdAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : ""}
-            </p>
-          </div>
-        </div>
-      );
-    })
+        <p>{msg.content}</p>
+
+        <p className="text-[10px] opacity-70 text-right mt-2">
+          {new Date(msg.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </p>
+      </div>
+    </div>
+  );
+})
   )}
 
   {typing && (
